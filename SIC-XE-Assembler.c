@@ -173,7 +173,6 @@ int main()
         else if (line[0] != ' ')
         {
             LABEL = strtok_s(line, " \n", &context);
-            addSymbol(LABEL, LOCCTR);
             OPCODE = strtok_s(NULL, " \n", &context);
             OPERAND = strtok_s(NULL, " \n", &context);
         }
@@ -189,31 +188,61 @@ int main()
         if (isValidDirective(OPCODE))
         {
             isDirective = true;
+            if (strcmp(OPCODE, "RESW") == 0)
+            {
+                LOCCTR += 3 * atoi(OPERAND);
+            }
+            else if (strcmp(OPCODE, "RESB") == 0)
+            {
+                LOCCTR += atoi(OPERAND);
+            }
+            else if (strcmp(OPCODE, "BYTE") == 0)
+            {
+                if (OPERAND[0] == 'C')
+                {
+                    int length = strlen(OPERAND) - 3;
+                    LOCCTR += length;
+                }
+                else if (OPERAND[0] == 'X')
+                {
+                    int hexLength = (strlen(OPERAND) - 3 + 1) / 2; // The +1 ensures rounding for odd numbers, Divide by 2 since 2 hex digits represent 1 byte
+                    LOCCTR += hexLength;
+                }
+                else
+                {
+                    printf("Error: Invalid BYTE format for operand: %s\n", OPERAND);
+                    exit(EXIT_FAILURE);
+                }
+            }
+            else
+            {
+                LOCCTR += 3;
+            }
         }
         else if (isValidOpcode(OPCODE))
         {
             isOpcode = true;
+            LOCCTR += 3;
         }
-        if (!isDirective && !isOpcode)
+        else
         {
             printf("Error: Pass 1, Line %d: Invalid operation '%s'\n", lineNumber, OPCODE);
             exit(EXIT_FAILURE);
         }
 
-        /*printf("Token 1: %s\n", LABEL);
-        printf("Token 2: %s\n", OPCODE);
-        printf("Token 3: %s\n\n", OPERAND);*/
+        
 
         if (strcmp(OPCODE, "START") == 0)
         {
             LOCCTR = atoi(OPERAND);
-            fprintf(outputFile1, "%d\t%d\t%s\t%s\t%s\n", lineNumber, LOCCTR, LABEL, OPCODE, OPERAND);
+            fprintf(outputFile1, "%d\t%X\t%s\t%s\t%s\n", lineNumber, LOCCTR, LABEL, OPCODE, OPERAND);
         }
-        else
+        if (LABEL != NULL)
         {
-            LOCCTR += 3;
-            
-
+            addSymbol(LABEL, LOCCTR);
+        }
+        if (strcmp(OPCODE, "START") != 0)
+        {
             if (OPERAND != NULL && strlen(OPERAND) >= 8) {
                 fprintf(outputFile1, "%d\t%X\t%s\t%s\t%s\t",
                     lineNumber,
