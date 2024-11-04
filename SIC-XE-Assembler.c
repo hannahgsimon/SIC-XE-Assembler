@@ -75,15 +75,13 @@ int isValidOpcode(char* OPCODE)
     return 0;
 }
 
-char* getObjectCode(const char* OPCODE)
+unsigned short int getObjectCode(const char* OPCODE)
 {
     for (int i = 0; i < OPTAB_SIZE; i++)
     {
         if (strcmp(OPTAB[i].Mnemonic, OPCODE) == 0)
         {
-            char* hexString = (char*)malloc(5);
-            sprintf_s(hexString, 5, "%02X", OPTAB[i].MachineCode);
-            return hexString;
+            return OPTAB[i].MachineCode;
         }
     }
     return NULL; // Return NULL if opcode not found
@@ -160,6 +158,7 @@ int main()
 
     fprintf(outputFile1, "LINE\tLOCCTR\tLABEL\tOPCODE\tOPERAND\t\tOBJ_CODE\n");
 
+    //Pass 1
     while (fgets(line, sizeof(line), file))
     {
         char lineCopy[256];
@@ -214,43 +213,41 @@ int main()
         {
             LOCCTR += 3;
             
-            char OBJCODE[5];
-            if (isOpcode)
-            {
-                char* hexString = getObjectCode(OPCODE);
-                strncpy_s(OBJCODE, sizeof(OBJCODE), hexString, 4);
-                free(hexString);
-            }
-            else
-            {
-                OBJCODE[0] = '\0';
-            }
 
             if (OPERAND != NULL && strlen(OPERAND) >= 8) {
-                fprintf(outputFile1, "%d\t%X\t%s\t%s\t%s\t%s\n",
+                fprintf(outputFile1, "%d\t%X\t%s\t%s\t%s\t",
                     lineNumber,
                     LOCCTR,
                     (LABEL != NULL) ? LABEL : "",
                     (OPCODE != NULL) ? OPCODE : "",
-                    (OPERAND != NULL) ? OPERAND : "",
-                    OBJCODE);
+                    (OPERAND != NULL) ? OPERAND : "");
             }
             else
             {
-                fprintf(outputFile1, "%d\t%X\t%s\t%s\t%s\t\t%s\n",
+                fprintf(outputFile1, "%d\t%X\t%s\t%s\t%s\t\t",
                     lineNumber,
                     LOCCTR,
                     (LABEL != NULL) ? LABEL : "",
                     (OPCODE != NULL) ? OPCODE : "",
-                    (OPERAND != NULL) ? OPERAND : "",
-                    OBJCODE);
+                    (OPERAND != NULL) ? OPERAND : "");
             }
+            if (isOpcode)
+            {
+                unsigned short int OBJCODE = getObjectCode(OPCODE);
+                fprintf(outputFile1, "%02X\n", OBJCODE);
+            }
+            else
+            {
+                fprintf(outputFile1, "\n");
+            }
+
             if (strcmp(OPCODE, "END") != 0)
             {
 
             }
             else if (strcmp(OPCODE, "END") == 0)
             {
+                
                 break;
             }
         }
@@ -262,11 +259,18 @@ int main()
         fprintf(outputFile1, "%s\t%X\n", symbolTable[i].name, symbolTable[i].address);
     }
     fclose(outputFile1);
+    
 
     //loop, read from outputfile 1, after closing for writing, reopen it for reading
     //search table for menumonic, find corresponding opcode
+    // Pass 2
+    fopen_s(&outputFile1, "ListingFile.txt", "r");
+    while (fgets(line, sizeof(line), outputFile1))
+    {
 
+    }
     
+    fclose(outputFile1);
     fclose(outputFile2);
     fclose(file);
     return 0;
