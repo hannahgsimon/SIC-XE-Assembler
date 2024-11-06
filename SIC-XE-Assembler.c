@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <malloc.h>
 
-const char* DIRECTIVES[] = { "START", "BYTE", "WORD", "RESB", "RESW", "END", "BASE", "NOBASE" };
+const char* DIRECTIVES[] = {"BYTE", "WORD", "RESB", "RESW", "END", "BASE", "NOBASE" };
 #define DIRECTIVES_SIZE (sizeof(DIRECTIVES) / sizeof(DIRECTIVES[0]))
 
 int isValidDirective(const char* OPCODE)
@@ -94,8 +94,8 @@ typedef struct Symbol
 } Symbol;
 
 Symbol symbolTable[100];
-int lineNumber = 0;
 int symbolCount = 0;
+int lineNumber = 0;
 
 int isDuplicateSymbol(const char* label)
 {
@@ -147,27 +147,24 @@ int main()
 
     printf("Author Info: Hannah Simon & Charlie Strickland\n\n");
 
-    char line[256];
-    char* LABEL = NULL;
-    char* OPCODE = NULL;
-    char* OPERAND = NULL;
-    char* context = NULL;
-    int LOCCTR = NULL;
-    FILE* outputFile1 = fopen("ListingFile.txt", "w");
-    FILE* outputFile2 = fopen("ObjectCode.txt", "w");
-
-    fprintf(outputFile1, "LINE\tLOCCTR\tLABEL\tOPCODE\tOPERAND\t\tOBJ_CODE\n");
+    char line[256], lineCopy[256];
+    char* LABEL = NULL, * OPCODE = NULL, * OPERAND = NULL, * context = NULL;
+    int LOCCTR = 0;
+    bool firstLine = true;
+    FILE* ListingFile = fopen("ListingFile.txt", "w");
+    FILE* ObjectCode = fopen("ObjectCode.txt", "w");
+    
+    fprintf(ListingFile, "LINE\tLOCCTR\tSOURCE STATEMENT\n");
 
     //Pass 1
     while (fgets(line, sizeof(line), file))
     {
-        char lineCopy[256];
-        strcpy_s(lineCopy, sizeof(lineCopy), line);
-        lineNumber++;
+        lineNumber += 5;
 
         if (line[0] == '.')
         {
-            fprintf(outputFile1, "%d\t%s", lineNumber, lineCopy);
+            strcpy_s(lineCopy, sizeof(lineCopy), line);
+            fprintf(ListingFile, "%d\t%s", lineNumber, lineCopy);
             continue;
         }
         else if (line[0] != ' ')
@@ -183,124 +180,125 @@ int main()
             OPERAND = strtok_s(NULL, " \n", &context);
         }
 
-        bool isDirective = false;
-        bool isOpcode = false;
-        if (isValidDirective(OPCODE))
+        if (firstLine)
         {
-            isDirective = true;
-            if (strcmp(OPCODE, "RESW") == 0)
+            if (strcmp(OPCODE, "START") == 0)
             {
-                LOCCTR += 3 * atoi(OPERAND);
+                LOCCTR = atoi(OPERAND);
             }
-            else if (strcmp(OPCODE, "RESB") == 0)
+            fprintf(ListingFile, "%d\t%d\t%s\t%s\t%s\n", lineNumber, LOCCTR, LABEL, OPCODE, OPERAND);
+            if (LABEL != NULL)
             {
-                LOCCTR += atoi(OPERAND);
+                addSymbol(LABEL, LOCCTR);
             }
-            else if (strcmp(OPCODE, "BYTE") == 0)
-            {
-                if (OPERAND[0] == 'C')
-                {
-                    int length = strlen(OPERAND) - 3;
-                    LOCCTR += length;
-                }
-                else if (OPERAND[0] == 'X')
-                {
-                    int hexLength = (strlen(OPERAND) - 3 + 1) / 2; // The +1 ensures rounding for odd numbers, Divide by 2 since 2 hex digits represent 1 byte
-                    LOCCTR += hexLength;
-                }
-                else
-                {
-                    printf("Error: Invalid BYTE format for operand: %s\n", OPERAND);
-                    exit(EXIT_FAILURE);
-                }
-            }
-            else
-            {
-                LOCCTR += 3;
-            }
+            firstLine = false;
+            continue;
         }
-        else if (isValidOpcode(OPCODE))
-        {
-            isOpcode = true;
-            LOCCTR += 3;
-        }
-        else
-        {
-            printf("Error: Pass 1, Line %d: Invalid operation '%s'\n", lineNumber, OPCODE);
-            exit(EXIT_FAILURE);
-        }
-
         
-
-        if (strcmp(OPCODE, "START") == 0)
-        {
-            LOCCTR = atoi(OPERAND);
-            fprintf(outputFile1, "%d\t%X\t%s\t%s\t%s\n", lineNumber, LOCCTR, LABEL, OPCODE, OPERAND);
-        }
         if (LABEL != NULL)
         {
             addSymbol(LABEL, LOCCTR);
         }
+
         if (strcmp(OPCODE, "START") != 0)
         {
-            if (OPERAND != NULL && strlen(OPERAND) >= 8) {
-                fprintf(outputFile1, "%d\t%X\t%s\t%s\t%s\t",
-                    lineNumber,
-                    LOCCTR,
-                    (LABEL != NULL) ? LABEL : "",
-                    (OPCODE != NULL) ? OPCODE : "",
-                    (OPERAND != NULL) ? OPERAND : "");
+            bool isDirective = false;
+            bool isOpcode = false;
+            if (isValidDirective(OPCODE))
+            {
+                isDirective = true;
+                writeToListingFile(ListingFile, LOCCTR, LABEL, OPCODE, OPERAND, isOpcode);
+                if (strcmp(OPCODE, "RESW") == 0)
+                {
+                    LOCCTR += 3 * atoi(OPERAND);
+                }
+                else if (strcmp(OPCODE, "RESB") == 0)
+                {
+                    LOCCTR += atoi(OPERAND);
+                }
+                else if (strcmp(OPCODE, "BYTE") == 0)
+                {
+                    if (OPERAND[0] == 'C')
+                    {
+                        int length = strlen(OPERAND) - 3;
+                        LOCCTR += length;
+                    }
+                    else if (OPERAND[0] == 'X')
+                    {
+                        int hexLength = (strlen(OPERAND) - 3 + 1) / 2; // The +1 ensures rounding for odd numbers, Divide by 2 since 2 hex digits represent 1 byte
+                        LOCCTR += hexLength;
+                    }
+                    else
+                    {
+                        printf("Error: Invalid BYTE format for operand: %s\n", OPERAND);
+                        exit(EXIT_FAILURE);
+                    }
+                }
+                else
+                {
+                    LOCCTR += 3;
+                }
+            }
+            else if (isValidOpcode(OPCODE))
+            {
+                isOpcode = true;
+                writeToListingFile(ListingFile, LOCCTR, LABEL, OPCODE, OPERAND, isOpcode);
+                LOCCTR += 3;
             }
             else
             {
-                fprintf(outputFile1, "%d\t%X\t%s\t%s\t%s\t\t",
-                    lineNumber,
-                    LOCCTR,
-                    (LABEL != NULL) ? LABEL : "",
-                    (OPCODE != NULL) ? OPCODE : "",
-                    (OPERAND != NULL) ? OPERAND : "");
-            }
-            if (isOpcode)
-            {
-                unsigned short int OBJCODE = getObjectCode(OPCODE);
-                fprintf(outputFile1, "%02X\n", OBJCODE);
-            }
-            else
-            {
-                fprintf(outputFile1, "\n");
+                printf("Error: Pass 1, Line %d: Invalid operation '%s'\n", lineNumber, OPCODE);
+                exit(EXIT_FAILURE);
             }
 
-            if (strcmp(OPCODE, "END") != 0)
+            if (strcmp(OPCODE, "END") == 0)
             {
-
-            }
-            else if (strcmp(OPCODE, "END") == 0)
-            {
-                
                 break;
             }
         }
     }
 
-    fprintf(outputFile1, "\nSYMBOL\tADDRESS\n");
+    fprintf(ListingFile, "\nSYMBOL\tADDRESS\n");
     for (int i = 0; i < symbolCount; i++)
     {
-        fprintf(outputFile1, "%s\t%X\n", symbolTable[i].name, symbolTable[i].address);
+        fprintf(ListingFile, "%s\t%d\n", symbolTable[i].name, symbolTable[i].address);
     }
-    fclose(outputFile1);
+    fclose(ListingFile);
     
 
     //loop, read from outputfile 1, after closing for writing, reopen it for reading
     //search table for menumonic, find corresponding opcode
     // Pass 2
-    fopen_s(&outputFile1, "ListingFile.txt", "r");
-    while (fgets(line, sizeof(line), outputFile1))
+    fopen_s(&ListingFile, "ListingFile.txt", "r");
+    while (fgets(line, sizeof(line), ListingFile))
     {
 
     }
     
-    fclose(outputFile1);
-    fclose(outputFile2);
+    fclose(ListingFile);
+    fclose(ObjectCode);
     fclose(file);
     return 0;
+}
+
+writeToListingFile(FILE* ListingFile, int LOCCTR, char* LABEL, char* OPCODE, char* OPERAND, bool isOpcode)
+{
+    if (OPERAND != NULL && strlen(OPERAND) >= 8)
+    {
+        fprintf(ListingFile, "%d\t%d\t%s\t%s\t%s\n",
+            lineNumber,
+            LOCCTR,
+            (LABEL != NULL) ? LABEL : "",
+            (OPCODE != NULL) ? OPCODE : "",
+            (OPERAND != NULL) ? OPERAND : "");
+    }
+    else
+    {
+        fprintf(ListingFile, "%d\t%d\t%s\t%s\t%s\n",
+            lineNumber,
+            LOCCTR,
+            (LABEL != NULL) ? LABEL : "",
+            (OPCODE != NULL) ? OPCODE : "",
+            (OPERAND != NULL) ? OPERAND : "");
+    }
 }
