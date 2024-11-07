@@ -75,7 +75,7 @@ int isValidOpcode(char* OPCODE)
     return 0;
 }
 
-unsigned short int getObjectCode(const char* OPCODE)
+unsigned short int getMachineCode(const char* OPCODE)
 {
     for (int i = 0; i < OPTAB_SIZE; i++)
     {
@@ -121,6 +121,19 @@ void addSymbol(const char* LABEL, unsigned short int address)
     symbolCount++;
 }
 
+int getSymbolAddress(const char* name)
+{
+    for (int i = 0; i < symbolCount; i++)
+    {
+        if (strcmp(symbolTable[i].name, name) == 0)
+        {
+            return symbolTable[i].address; // Return the address if found
+        }
+    }
+    return 0;
+}
+
+
 //int main(int argc, char* argv[])
 int main()
 {
@@ -154,7 +167,7 @@ int main()
     FILE* ListingFile = fopen("ListingFile.txt", "w");
     FILE* ObjectCode = fopen("ObjectCode.txt", "w");
     
-    fprintf(ListingFile, "LINE\tLOCCTR\tSOURCE STATEMENT\n");
+    fprintf(ListingFile, "LINE\tLOCCTR\tSOURCE_STATEMENT\n");
 
     //Pass 1
     while (fgets(line, sizeof(line), file))
@@ -264,17 +277,97 @@ int main()
         fprintf(ListingFile, "%s\t%d\n", symbolTable[i].name, symbolTable[i].address);
     }
     fclose(ListingFile);
+    fopen_s(ListingFile, "ListingFile.txt", "r+");
     
-
+    char* LINE = NULL, * ADDRESS = NULL;
     //loop, read from outputfile 1, after closing for writing, reopen it for reading
     //search table for menumonic, find corresponding opcode
     // Pass 2
-    fopen_s(&ListingFile, "ListingFile.txt", "r");
+    
+    firstLine = true;
+
+    fprintf(ObjectCode, "HCOPY\t");
     while (fgets(line, sizeof(line), ListingFile))
     {
+        if (firstLine)
+        {
+            FILE* tempFile;
+            tmpfile_s(&tempFile);
 
+            size_t len = strlen(line);
+            if (len > 0 && line[len - 1] == '\n')
+            {
+                line[len - 1] = '\0';
+            }
+            fprintf(tempFile, "%s\tOBJ_CODE\n", line);
+
+            char buffer[256];
+            while (fgets(buffer, sizeof(buffer), ListingFile))
+            {
+                fputs(buffer, tempFile);
+            }
+
+            fclose(ListingFile);
+            fopen_s(&ListingFile, "ListingFile.txt", "w");
+
+            rewind(tempFile);
+            while (fgets(buffer, sizeof(buffer), tempFile))
+            {
+                fputs(buffer, ListingFile);
+            }
+
+            fclose(tempFile);
+            fclose(ListingFile);
+            fopen_s(&ListingFile, "ListingFile.txt", "r");
+            firstLine = false;
+            continue;
+        }
+
+        LINE = strtok_s(line, "\t\n", &context);
+        ADDRESS = strtok_s(NULL, " \t\n", &context);
+        LABEL = strtok_s(NULL, " \t\n", &context);
+        OPCODE = strtok_s(NULL, " \t\n", &context);
+        OPERAND = strtok_s(NULL, " \t\n", &context);
+
+        if (LINE == NULL)
+        {
+            break;
+        }
+        if (OPCODE == NULL)
+        {
+            OPCODE = LABEL;
+            LABEL = NULL;
+        }
+        else if (OPERAND == NULL)
+        {
+            OPERAND = OPCODE;
+            OPCODE = LABEL;
+            LABEL = NULL;
+        }
+        
+        printf("LINE: %s\n", LINE);
+        printf("LOCCTR: %s\n", ADDRESS);
+        printf("LABEL: %s\n", LABEL);
+        printf("OPCODE: %s\n", OPCODE);
+        printf("OPERAND: %s\n\n", OPERAND);
+
+
+        if (strcmp(LINE, "LINE") == 0 || strcmp(ADDRESS, ".") == 0)
+        {
+            continue;
+        }
+        if (strcmp(OPCODE, "START") == 0)
+        {
+            continue;
+        }
+        if (LABEL != NULL && OPCODE != NULL)
+        {
+            unsigned short int OPCODEINT = getMachineCode(OPCODE);
+            int ADDR = getSymbolAddress(LABEL);
+            fprintf(ObjectCode, "%d%d\n", OPCODEINT, ADDR);
+        }
     }
-    
+
     fclose(ListingFile);
     fclose(ObjectCode);
     fclose(file);
