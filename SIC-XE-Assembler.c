@@ -280,6 +280,14 @@ int main()
     fopen_s(ListingFile, "ListingFile.txt", "r+");
     
     char* LINE = NULL, * ADDRESS = NULL;
+    typedef struct {
+        int lineNum;
+        unsigned short int opcode;
+        int addr;
+    } ObjCode;
+
+    ObjCode objectCodes[100];
+    int objCodeCount = 0;
     //loop, read from outputfile 1, after closing for writing, reopen it for reading
     //search table for menumonic, find corresponding opcode
     // Pass 2
@@ -360,14 +368,97 @@ int main()
         {
             continue;
         }
-        if (LABEL != NULL && OPCODE != NULL)
+
+        unsigned short int OPCODEINT = NULL;
+        int ADDR = NULL;
+
+        if (strcmp(OPCODE, "RESW") == 0 || strcmp(OPCODE, "RESB") == 0)
         {
-            unsigned short int OPCODEINT = getMachineCode(OPCODE);
-            int ADDR = getSymbolAddress(LABEL);
-            fprintf(ObjectCode, "%d%d\n", OPCODEINT, ADDR);
+
         }
+        else if (strcmp(OPCODE, "BYTE") == 0)
+        {
+            if (OPERAND[0] == 'C')
+            {
+                int length = strlen(OPERAND) - 3;
+                LOCCTR += length;
+            }
+            else if (OPERAND[0] == 'X')
+            {
+                OPCODEINT = (OPERAND[2] - '0') * 10 + (OPERAND[3] - '0');
+            }
+            else
+            {
+                printf("Error: Invalid BYTE format for operand: %s\n", OPERAND);
+                exit(EXIT_FAILURE);
+            }
+        }
+        else if (OPERAND != NULL)
+        {
+            OPCODEINT = getMachineCode(OPCODE);
+            ADDR = getSymbolAddress(OPERAND);
+        }
+        else if (OPERAND == NULL)
+        {
+            OPCODEINT = getMachineCode(OPCODE);
+            ADDR = 0000;
+        }
+        objectCodes[objCodeCount].lineNum = atoi(LINE);
+        objectCodes[objCodeCount].opcode = OPCODEINT;
+        objectCodes[objCodeCount].addr = ADDR;
+        objCodeCount++;
+        
     }
 
+    FILE* tempFile;
+    tmpfile_s(&tempFile);
+    if (tempFile == NULL)
+    {
+        printf("Error creating temporary file\n");
+        exit(EXIT_FAILURE);
+    }
+
+    rewind(ListingFile);
+    char buffer[256];
+    int currentLine = 0;
+    while (fgets(buffer, sizeof(buffer), ListingFile))
+    {
+        // Remove newline
+        size_t len = strlen(buffer);
+        if (len > 0 && buffer[len - 1] == '\n') {
+            buffer[len - 1] = '\0';
+        }
+
+        // Check if this line has an object code
+        bool hasObjCode = false;
+        for (int i = 0; i < objCodeCount; i++)
+        {
+            if (currentLine == objectCodes[i].lineNum)
+            {
+                fprintf(tempFile, "%s\t%02X%04d\n", buffer, objectCodes[i].opcode, objectCodes[i].addr);
+                hasObjCode = true;
+                break;
+            }
+        }
+
+        if (!hasObjCode)
+        {
+            fprintf(tempFile, "%s\n", buffer);
+        }
+
+        currentLine += 5;
+    }
+
+    // Copy back to original file
+    fclose(ListingFile);
+    fopen_s(&ListingFile, "ListingFile.txt", "w");
+    rewind(tempFile);
+    while (fgets(buffer, sizeof(buffer), tempFile))
+    {
+        fputs(buffer, ListingFile);
+    }
+
+    fclose(tempFile);
     fclose(ListingFile);
     fclose(ObjectCode);
     fclose(file);
