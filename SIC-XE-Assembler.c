@@ -275,20 +275,16 @@ int main()
 
     fclose(IntermediateFile);
     fopen_s(IntermediateFile, "IntermediateFile.txt", "r");
-    
     char* LINE = NULL, * ADDRESS = NULL;
-
-    //loop, read from outputfile 1, after closing for writing, reopen it for reading
-    //search table for menumonic, find corresponding opcode
-    // Pass 2
-    
     firstLine = true;
+    char buffer[70] = { 0 };
 
+    // PASS 2
     while (fgets(line, sizeof(line), IntermediateFile))
     {
         strcpy_s(lineCopy, sizeof(lineCopy), line);
         
-        size_t len = strlen(lineCopy);  // Remove trailing newline from lineCopy, if it exists
+        size_t len = strlen(lineCopy);
         if (len > 0 && lineCopy[len - 1] == '\n')
 {
             lineCopy[len - 1] = '\0';
@@ -338,14 +334,28 @@ int main()
         unsigned short int OPCODEINT = NULL;
         int ADDR = NULL;
 
-        if (strcmp(OPCODE, "RESW") == 0 || strcmp(OPCODE, "RESB") == 0)
+        if (OPERAND != NULL && strcmp(OPERAND, "BUFFER,X") == 0)
+        {
+            OPCODEINT = getMachineCode(OPCODE);
+            ADDR = getSymbolAddress("BUFFER");
+            char addrStr[5];
+            snprintf(addrStr, sizeof(addrStr), "%04d", ADDR);
+            int firstDigit = addrStr[0] - '0';
+            firstDigit &= 0x07;
+            firstDigit |= 0x08;
+            addrStr[0] = firstDigit + '0';
+            ADDR = atoi(addrStr);
+        }
+        else if (strcmp(OPCODE, "RESW") == 0 || strcmp(OPCODE, "RESB") == 0)
         {
             fprintf(ListingFile, "%s\n", lineCopy);
             continue;
         }
         else if (strcmp(OPCODE, "WORD") == 0)
         {
-            
+            fprintf(ListingFile, "%s\t%06d\n", lineCopy, atoi(OPERAND));
+            //later do X to convert to hex
+            continue;
         }
         else if (strcmp(OPCODE, "BYTE") == 0)
         {
@@ -362,30 +372,17 @@ int main()
                 }
 
                 fprintf(ListingFile, "%s\t%s\n", lineCopy, hexOutput);
-                continue;
             }
             else if (OPERAND[0] == 'X')
             {
-                int digit1, digit2;
-
-                // Convert the first hex character
-                if (OPERAND[2] >= '0' && OPERAND[2] <= '9')
-                    digit1 = OPERAND[2] - '0';
-                else if (OPERAND[2] >= 'A' && OPERAND[2] <= 'F')
-                    digit1 = OPERAND[2] - 'A' + 10;
-                else if (OPERAND[2] >= 'a' && OPERAND[2] <= 'f')
-                    digit1 = OPERAND[2] - 'a' + 10;
-
-                // Convert the second hex character
-                if (OPERAND[3] >= '0' && OPERAND[3] <= '9')
-                    digit2 = OPERAND[3] - '0';
-                else if (OPERAND[3] >= 'A' && OPERAND[3] <= 'F')
-                    digit2 = OPERAND[3] - 'A' + 10;
-                else if (OPERAND[3] >= 'a' && OPERAND[3] <= 'f')
-                    digit2 = OPERAND[3] - 'a' + 10;
-
-                // Combine the two digits to form the final OPCODEINT value
-                OPCODEINT = digit1 * 16 + digit2;
+                char* startQuote = &OPERAND[2];
+                char* endQuote = strchr(startQuote, '\'');
+                size_t hexLength = endQuote - startQuote;
+                char* hexString = (char*)malloc(hexLength + 1);
+                strncpy_s(hexString, hexLength + 1, startQuote, hexLength);
+                hexString[hexLength] = '\0';
+                fprintf(ListingFile, "%s\t%s\n", lineCopy, hexString);
+                free(hexString);
             }
             else
             {
@@ -397,26 +394,44 @@ int main()
         {
             OPCODEINT = getMachineCode(OPCODE);
             ADDR = getSymbolAddress(OPERAND);
+            fprintf(ListingFile, "%s\t%02d%04d\n", lineCopy, OPCODEINT, ADDR);
         }
         else if (OPERAND == NULL)
         {
             OPCODEINT = getMachineCode(OPCODE);
             ADDR = 0000;
+            fprintf(ListingFile, "%s\t%02d%04d\n", lineCopy, OPCODEINT, ADDR);
         }
-        fprintf(ListingFile, "%s\t%02d%04d\n", lineCopy, OPCODEINT, ADDR);
-
         
         if (strcmp(OPCODE, "END") == 0)
         {
             fprintf(ObjectCode, "\nE");
             break;
         }
+        if (buffer[0] == '\0')
+        {
+            buffer[0] = 'T';
+            char paddedAddress[7];
+            snprintf(paddedAddress, sizeof(paddedAddress), "%06s", ADDRESS);
+            strncat_s(buffer, sizeof(buffer), paddedAddress, sizeof(buffer) - strlen(buffer) - 1);
+            strncat_s(buffer, sizeof(buffer), "1E", sizeof(buffer) - strlen(buffer) - 1);   // Placeholder
+        }
+        char temp[20];
+        sprintf_s(temp, sizeof(temp), "%d", OPCODEINT);
+        strncat_s(buffer, sizeof(buffer), temp, sizeof(buffer) - strlen(buffer) - 1);
+        sprintf_s(temp, sizeof(temp), "%d", ADDR);
+        strncat_s(buffer, sizeof(buffer), temp, sizeof(buffer) - strlen(buffer) - 1);
+        printf("%s\n", buffer);
     }
 
     fprintf(ListingFile, "\nSYMBOL\tADDRESS\n");
     for (int i = 0; i < symbolCount; i++)
     {
-        fprintf(ListingFile, "%s\t%d\n", symbolTable[i].name, symbolTable[i].address);
+        fprintf(ListingFile, "%s\t%d", symbolTable[i].name, symbolTable[i].address);
+        if (i < symbolCount - 1)
+        {
+            fprintf(ListingFile, "\n");
+        }
     }
 
     fclose(IntermediateFile);
