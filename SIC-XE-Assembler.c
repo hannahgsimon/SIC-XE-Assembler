@@ -166,7 +166,7 @@ int main()
     bool firstLine = true;
     FILE* IntermediateFile = fopen("IntermediateFile.txt", "w");
     FILE* ListingFile = fopen("ListingFile.txt", "w");
-    FILE* ObjectCode = fopen("ObjectCode.txt", "w");
+    FILE* ObjectFile = fopen("ObjectCode.txt", "w");
     
     fprintf(IntermediateFile, "LINE\tLOCCTR\tSOURCE_STATEMENT\n");
 
@@ -327,12 +327,13 @@ int main()
         if (strcmp(OPCODE, "START") == 0)
         {
             fprintf(ListingFile, "%s\n", lineCopy);
-            fprintf(ObjectCode, "H%s\t%06s%06d", LABEL, ADDRESS, LOCCTR - atoi(ADDRESS));
+            fprintf(ObjectFile, "H%s\t%06s%06d\n", LABEL, ADDRESS, LOCCTR - atoi(ADDRESS));
             continue;
         }
 
         unsigned short int OPCODEINT = NULL;
         int ADDR = NULL;
+        char objectCode[8];
 
         if (OPERAND != NULL && strcmp(OPERAND, "BUFFER,X") == 0)
         {
@@ -345,15 +346,18 @@ int main()
             firstDigit |= 0x08;
             addrStr[0] = firstDigit + '0';
             ADDR = atoi(addrStr);
+
+            sprintf_s(objectCode, sizeof(objectCode), "%02d%04d", OPCODEINT, ADDR);
         }
         else if (strcmp(OPCODE, "RESW") == 0 || strcmp(OPCODE, "RESB") == 0)
         {
             fprintf(ListingFile, "%s\n", lineCopy);
+            //if buffer has contents, write it to objectfile and clear objectfile
             continue;
         }
         else if (strcmp(OPCODE, "WORD") == 0)
         {
-            fprintf(ListingFile, "%s\t%06d\n", lineCopy, atoi(OPERAND));
+            sprintf_s(objectCode, sizeof(objectCode), "%06d", atoi(OPERAND));
             //later do X to convert to hex
             continue;
         }
@@ -361,28 +365,22 @@ int main()
         {
             if (OPERAND[0] == 'C')
             {
-                char hexOutput[100] = "";
                 int i = 2; // Start after C'
                 int hexIndex = 0;
 
                 while (OPERAND[i] != '\'')
                 {
-                    hexIndex += snprintf(hexOutput + hexIndex, sizeof(hexOutput) - hexIndex, "%02X", OPERAND[i]);
+                    hexIndex += snprintf(objectCode + hexIndex, sizeof(objectCode) - hexIndex, "%02X", OPERAND[i]);
                     i++;
                 }
-
-                fprintf(ListingFile, "%s\t%s\n", lineCopy, hexOutput);
             }
             else if (OPERAND[0] == 'X')
             {
                 char* startQuote = &OPERAND[2];
                 char* endQuote = strchr(startQuote, '\'');
                 size_t hexLength = endQuote - startQuote;
-                char* hexString = (char*)malloc(hexLength + 1);
-                strncpy_s(hexString, hexLength + 1, startQuote, hexLength);
-                hexString[hexLength] = '\0';
-                fprintf(ListingFile, "%s\t%s\n", lineCopy, hexString);
-                free(hexString);
+                strncpy_s(objectCode, hexLength + 1, startQuote, hexLength);
+                objectCode[hexLength] = '\0';
             }
             else
             {
@@ -394,18 +392,23 @@ int main()
         {
             OPCODEINT = getMachineCode(OPCODE);
             ADDR = getSymbolAddress(OPERAND);
-            fprintf(ListingFile, "%s\t%02d%04d\n", lineCopy, OPCODEINT, ADDR);
+            sprintf_s(objectCode, sizeof(objectCode), "%02d%04d", OPCODEINT, ADDR);
         }
         else if (OPERAND == NULL)
         {
             OPCODEINT = getMachineCode(OPCODE);
             ADDR = 0000;
-            fprintf(ListingFile, "%s\t%02d%04d\n", lineCopy, OPCODEINT, ADDR);
+            sprintf_s(objectCode, sizeof(objectCode), "%02d%04d", OPCODEINT, ADDR);
         }
-        
+        fprintf(ListingFile, "%s\t%s\n", lineCopy, objectCode);
+
         if (strcmp(OPCODE, "END") == 0)
         {
-            fprintf(ObjectCode, "\nE");
+            if (strlen(buffer) > 0)
+            {
+                writeToObjectFile(ObjectFile, buffer);
+            }
+            fprintf(ObjectFile, "E%s", objectCode);
             break;
         }
         if (buffer[0] == '\0')
@@ -416,12 +419,14 @@ int main()
             strncat_s(buffer, sizeof(buffer), paddedAddress, sizeof(buffer) - strlen(buffer) - 1);
             strncat_s(buffer, sizeof(buffer), "1E", sizeof(buffer) - strlen(buffer) - 1);   // Placeholder
         }
-        char temp[20];
-        sprintf_s(temp, sizeof(temp), "%d", OPCODEINT);
-        strncat_s(buffer, sizeof(buffer), temp, sizeof(buffer) - strlen(buffer) - 1);
-        sprintf_s(temp, sizeof(temp), "%d", ADDR);
-        strncat_s(buffer, sizeof(buffer), temp, sizeof(buffer) - strlen(buffer) - 1);
-        printf("%s\n", buffer);
+        if (strlen(buffer) + strlen(objectCode) >= 69)
+        {
+            writeToObjectFile(ObjectFile, buffer);
+        }
+        else
+        {
+            strcat_s(buffer, sizeof(buffer), objectCode);
+        }
     }
 
     fprintf(ListingFile, "\nSYMBOL\tADDRESS\n");
@@ -436,7 +441,7 @@ int main()
 
     fclose(IntermediateFile);
     fclose(ListingFile);
-    fclose(ObjectCode);
+    fclose(ObjectFile);
     fclose(file);
     return 0;
 }
@@ -449,4 +454,15 @@ writeToIntermediateFile(FILE* IntermediateFile, int LOCCTR, char* LABEL, char* O
         (LABEL != NULL) ? LABEL : "",
         (OPCODE != NULL) ? OPCODE : "",
         (OPERAND != NULL) ? OPERAND : "");
+}
+
+writeToObjectFile(FILE* ObjectFile, char *buffer)
+{
+    int result = (strlen(buffer) - 9 + 1) / 2;  // +1 for rounding up
+    char resultChars[3];
+    sprintf_s(resultChars, sizeof(resultChars), "%02d", result); //use X here instead for hex
+    buffer[7] = resultChars[0];
+    buffer[8] = resultChars[1];
+    fprintf(ObjectFile, "%s\n", buffer);
+    memset(buffer, 0, sizeof(buffer));
 }
