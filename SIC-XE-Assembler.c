@@ -221,7 +221,7 @@ int main()
             if (isValidDirective(OPCODE))
             {
                 isDirective = true;
-                writeToListingFile(IntermediateFile, LOCCTR, LABEL, OPCODE, OPERAND, isOpcode);
+                writeToIntermediateFile(IntermediateFile, LOCCTR, LABEL, OPCODE, OPERAND, isOpcode);
                 if (strcmp(OPCODE, "END") == 0)
                 {
                     break;
@@ -256,11 +256,13 @@ int main()
                 {
                     LOCCTR += 3;
                 }
+                fprintf(IntermediateFile, "\n");
             }
             else if (isValidOpcode(OPCODE))
             {
                 isOpcode = true;
-                writeToListingFile(IntermediateFile, LOCCTR, LABEL, OPCODE, OPERAND, isOpcode);
+                writeToIntermediateFile(IntermediateFile, LOCCTR, LABEL, OPCODE, OPERAND, isOpcode);
+                fprintf(IntermediateFile, "\n");
                 LOCCTR += 3;
             }
             else
@@ -271,23 +273,11 @@ int main()
         }
     }
 
-    fprintf(IntermediateFile, "\nSYMBOL\tADDRESS\n");
-    for (int i = 0; i < symbolCount; i++)
-    {
-        fprintf(IntermediateFile, "%s\t%d\n", symbolTable[i].name, symbolTable[i].address);
-    }
     fclose(IntermediateFile);
-    fopen_s(IntermediateFile, "ListingFile.txt", "r");
+    fopen_s(IntermediateFile, "IntermediateFile.txt", "r");
     
     char* LINE = NULL, * ADDRESS = NULL;
-    typedef struct {
-        int lineNum;
-        unsigned short int opcode;
-        int addr;
-    } ObjCode;
 
-    ObjCode objectCodes[100];
-    int objCodeCount = 0;
     //loop, read from outputfile 1, after closing for writing, reopen it for reading
     //search table for menumonic, find corresponding opcode
     // Pass 2
@@ -297,7 +287,14 @@ int main()
     while (fgets(line, sizeof(line), IntermediateFile))
     {
         strcpy_s(lineCopy, sizeof(lineCopy), line);
-        if (firstLine)
+        
+        size_t len = strlen(lineCopy);  // Remove trailing newline from lineCopy, if it exists
+        if (len > 0 && lineCopy[len - 1] == '\n')
+{
+            lineCopy[len - 1] = '\0';
+        }
+
+        if (firstLine && line[0] != '.')
         {
             fprintf(ListingFile, "%s\tOBJ_CODE\n", lineCopy);
             firstLine = false;
@@ -325,20 +322,15 @@ int main()
             OPCODE = LABEL;
             LABEL = NULL;
         }
-        
-        printf("LINE: %s\n", LINE);
-        printf("LOCCTR: %s\n", ADDRESS);
-        printf("LABEL: %s\n", LABEL);
-        printf("OPCODE: %s\n", OPCODE);
-        printf("OPERAND: %s\n\n", OPERAND);
 
-
-        if (strcmp(LINE, "LINE") == 0 || strcmp(ADDRESS, ".") == 0)
+        if (strcmp(ADDRESS, ".") == 0)
         {
+            fprintf(ListingFile, "%s\n", lineCopy);
             continue;
         }
         if (strcmp(OPCODE, "START") == 0)
         {
+            fprintf(ListingFile, "%s\n", lineCopy);
             fprintf(ObjectCode, "H%s\t%06s%06d", LABEL, ADDRESS, LOCCTR - atoi(ADDRESS));
             continue;
         }
@@ -348,14 +340,29 @@ int main()
 
         if (strcmp(OPCODE, "RESW") == 0 || strcmp(OPCODE, "RESB") == 0)
         {
-
+            fprintf(ListingFile, "%s\n", lineCopy);
+            continue;
+        }
+        else if (strcmp(OPCODE, "WORD") == 0)
+        {
+            
         }
         else if (strcmp(OPCODE, "BYTE") == 0)
         {
             if (OPERAND[0] == 'C')
             {
-                int length = strlen(OPERAND) - 3;
-                LOCCTR += length;
+                char hexOutput[100] = "";
+                int i = 2; // Start after C'
+                int hexIndex = 0;
+
+                while (OPERAND[i] != '\'')
+                {
+                    hexIndex += snprintf(hexOutput + hexIndex, sizeof(hexOutput) - hexIndex, "%02X", OPERAND[i]);
+                    i++;
+                }
+
+                fprintf(ListingFile, "%s\t%s\n", lineCopy, hexOutput);
+                continue;
             }
             else if (OPERAND[0] == 'X')
             {
@@ -396,10 +403,8 @@ int main()
             OPCODEINT = getMachineCode(OPCODE);
             ADDR = 0000;
         }
-        objectCodes[objCodeCount].lineNum = atoi(LINE);
-        objectCodes[objCodeCount].opcode = OPCODEINT;
-        objectCodes[objCodeCount].addr = ADDR;
-        objCodeCount++;
+        fprintf(ListingFile, "%s\t%02d%04d\n", lineCopy, OPCODEINT, ADDR);
+
         
         if (strcmp(OPCODE, "END") == 0)
         {
@@ -408,79 +413,25 @@ int main()
         }
     }
 
-    FILE* tempFile;
-    tmpfile_s(&tempFile);
-    if (tempFile == NULL)
+    fprintf(ListingFile, "\nSYMBOL\tADDRESS\n");
+    for (int i = 0; i < symbolCount; i++)
     {
-        printf("Error creating temporary file\n");
-        exit(EXIT_FAILURE);
+        fprintf(ListingFile, "%s\t%d\n", symbolTable[i].name, symbolTable[i].address);
     }
 
-    rewind(ListingFile);
-    char buffer[256];
-    int currentLine = 0;
-    while (fgets(buffer, sizeof(buffer), ListingFile))
-    {
-        // Remove newline
-        size_t len = strlen(buffer);
-        if (len > 0 && buffer[len - 1] == '\n') {
-            buffer[len - 1] = '\0';
-        }
-
-        // Check if this line has an object code
-        bool hasObjCode = false;
-        for (int i = 0; i < objCodeCount; i++)
-        {
-            if (currentLine == objectCodes[i].lineNum)
-            {
-                fprintf(tempFile, "%s\t%02X%04d\n", buffer, objectCodes[i].opcode, objectCodes[i].addr);
-                hasObjCode = true;
-                break;
-            }
-        }
-
-        if (!hasObjCode)
-        {
-            fprintf(tempFile, "%s\n", buffer);
-        }
-
-        currentLine += 5;
-    }
-
-    // Copy back to original file
-    fclose(ListingFile);
-    fopen_s(&ListingFile, "ListingFile.txt", "w");
-    rewind(tempFile);
-    while (fgets(buffer, sizeof(buffer), tempFile))
-    {
-        fputs(buffer, ListingFile);
-    }
-
-    fclose(tempFile);
+    fclose(IntermediateFile);
     fclose(ListingFile);
     fclose(ObjectCode);
     fclose(file);
     return 0;
 }
 
-writeToListingFile(FILE* ListingFile, int LOCCTR, char* LABEL, char* OPCODE, char* OPERAND, bool isOpcode)
+writeToIntermediateFile(FILE* IntermediateFile, int LOCCTR, char* LABEL, char* OPCODE, char* OPERAND, bool isOpcode)
 {
-    if (OPERAND != NULL && strlen(OPERAND) >= 8)
-    {
-        fprintf(ListingFile, "%d\t%d\t%s\t%s\t%s\n",
-            lineNumber,
-            LOCCTR,
-            (LABEL != NULL) ? LABEL : "",
-            (OPCODE != NULL) ? OPCODE : "",
-            (OPERAND != NULL) ? OPERAND : "");
-    }
-    else
-    {
-        fprintf(ListingFile, "%d\t%d\t%s\t%s\t%s\n",
-            lineNumber,
-            LOCCTR,
-            (LABEL != NULL) ? LABEL : "",
-            (OPCODE != NULL) ? OPCODE : "",
-            (OPERAND != NULL) ? OPERAND : "");
-    }
+    fprintf(IntermediateFile, "%d\t%d\t%s\t%s\t%s",
+        lineNumber,
+        LOCCTR,
+        (LABEL != NULL) ? LABEL : "",
+        (OPCODE != NULL) ? OPCODE : "",
+        (OPERAND != NULL) ? OPERAND : "");
 }
