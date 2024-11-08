@@ -29,10 +29,10 @@ typedef struct OperationCodeTable
 static SIC_OPTAB OPTAB[] =
 {
     {   "ADD",  '3',  0x18},
-    {  "ADDR",  '3',  0x90},
-    { "CLEAR",  '3',  0xB4},
+    //{  "ADDR",  '2',  0x90},
+    //{ "CLEAR",  '2',  0xB4},
     {  "COMP",  '3',  0x28},
-    { "COMPR",  '3',  0xA0},
+    //{ "COMPR",  '2',  0xA0},
     {   "DIV",  '3',  0x24},
     {     "J",  '3',  0x3C},
     {   "JEQ",  '3',  0x30},
@@ -40,22 +40,22 @@ static SIC_OPTAB OPTAB[] =
     {   "JLT",  '3',  0x38},
     {  "JSUB",  '3',  0x48},
     {   "LDA",  '3',  0x00},
-    {   "LDB",  '3',  0x68},
+    //{   "LDB",  '3',  0x68},
     {  "LDCH",  '3',  0x50},
     {   "LDL",  '3',  0x08},
-    {   "LDT",  '3',  0x74},
+    //{   "LDT",  '3',  0x74},
     {   "LDX",  '3',  0x04},
     {   "MUL",  '3',  0x20},
     {    "RD",  '3',  0xD8},
     {  "RSUB",  '3',  0x4C},
     {   "STA",  '3',  0x0C},
-    {   "STB",  '3',  0x78},
+    //{   "STB",  '3',  0x78},
     {  "STCH",  '3',  0x54},
     {   "STL",  '3',  0x14},
     {  "STSW",  '3',  0xE8},
     {   "STX",  '3',  0x10},
     {   "SUB",  '3',  0x1C},
-    {   "SUBR",  '3', 0x94},
+    //{   "SUBR",  '2', 0x94},
     {    "TD",  '3',  0xE0},
     {   "TIX",  '3',  0x2C},
     {    "WD",  '3',  0xDC},
@@ -164,10 +164,11 @@ int main()
     char* LABEL = NULL, * OPCODE = NULL, * OPERAND = NULL, * context = NULL;
     int LOCCTR = 0;
     bool firstLine = true;
+    FILE* IntermediateFile = fopen("IntermediateFile.txt", "w");
     FILE* ListingFile = fopen("ListingFile.txt", "w");
     FILE* ObjectCode = fopen("ObjectCode.txt", "w");
     
-    fprintf(ListingFile, "LINE\tLOCCTR\tSOURCE_STATEMENT\n");
+    fprintf(IntermediateFile, "LINE\tLOCCTR\tSOURCE_STATEMENT\n");
 
     //Pass 1
     while (fgets(line, sizeof(line), file))
@@ -177,7 +178,7 @@ int main()
         if (line[0] == '.')
         {
             strcpy_s(lineCopy, sizeof(lineCopy), line);
-            fprintf(ListingFile, "%d\t%s", lineNumber, lineCopy);
+            fprintf(IntermediateFile, "%d\t%s", lineNumber, lineCopy);
             continue;
         }
         else if (line[0] != ' ')
@@ -199,7 +200,7 @@ int main()
             {
                 LOCCTR = atoi(OPERAND);
             }
-            fprintf(ListingFile, "%d\t%d\t%s\t%s\t%s\n", lineNumber, LOCCTR, LABEL, OPCODE, OPERAND);
+            fprintf(IntermediateFile, "%d\t%d\t%s\t%s\t%s\n", lineNumber, LOCCTR, LABEL, OPCODE, OPERAND);
             if (LABEL != NULL)
             {
                 addSymbol(LABEL, LOCCTR);
@@ -220,8 +221,12 @@ int main()
             if (isValidDirective(OPCODE))
             {
                 isDirective = true;
-                writeToListingFile(ListingFile, LOCCTR, LABEL, OPCODE, OPERAND, isOpcode);
-                if (strcmp(OPCODE, "RESW") == 0)
+                writeToListingFile(IntermediateFile, LOCCTR, LABEL, OPCODE, OPERAND, isOpcode);
+                if (strcmp(OPCODE, "END") == 0)
+                {
+                    break;
+                }
+                else if (strcmp(OPCODE, "RESW") == 0)
                 {
                     LOCCTR += 3 * atoi(OPERAND);
                 }
@@ -255,7 +260,7 @@ int main()
             else if (isValidOpcode(OPCODE))
             {
                 isOpcode = true;
-                writeToListingFile(ListingFile, LOCCTR, LABEL, OPCODE, OPERAND, isOpcode);
+                writeToListingFile(IntermediateFile, LOCCTR, LABEL, OPCODE, OPERAND, isOpcode);
                 LOCCTR += 3;
             }
             else
@@ -263,21 +268,16 @@ int main()
                 printf("Error: Pass 1, Line %d: Invalid operation '%s'\n", lineNumber, OPCODE);
                 exit(EXIT_FAILURE);
             }
-
-            if (strcmp(OPCODE, "END") == 0)
-            {
-                break;
-            }
         }
     }
 
-    fprintf(ListingFile, "\nSYMBOL\tADDRESS\n");
+    fprintf(IntermediateFile, "\nSYMBOL\tADDRESS\n");
     for (int i = 0; i < symbolCount; i++)
     {
-        fprintf(ListingFile, "%s\t%d\n", symbolTable[i].name, symbolTable[i].address);
+        fprintf(IntermediateFile, "%s\t%d\n", symbolTable[i].name, symbolTable[i].address);
     }
-    fclose(ListingFile);
-    fopen_s(ListingFile, "ListingFile.txt", "r+");
+    fclose(IntermediateFile);
+    fopen_s(IntermediateFile, "ListingFile.txt", "r");
     
     char* LINE = NULL, * ADDRESS = NULL;
     typedef struct {
@@ -294,39 +294,12 @@ int main()
     
     firstLine = true;
 
-    fprintf(ObjectCode, "HCOPY\t");
-    while (fgets(line, sizeof(line), ListingFile))
+    while (fgets(line, sizeof(line), IntermediateFile))
     {
+        strcpy_s(lineCopy, sizeof(lineCopy), line);
         if (firstLine)
         {
-            FILE* tempFile;
-            tmpfile_s(&tempFile);
-
-            size_t len = strlen(line);
-            if (len > 0 && line[len - 1] == '\n')
-            {
-                line[len - 1] = '\0';
-            }
-            fprintf(tempFile, "%s\tOBJ_CODE\n", line);
-
-            char buffer[256];
-            while (fgets(buffer, sizeof(buffer), ListingFile))
-            {
-                fputs(buffer, tempFile);
-            }
-
-            fclose(ListingFile);
-            fopen_s(&ListingFile, "ListingFile.txt", "w");
-
-            rewind(tempFile);
-            while (fgets(buffer, sizeof(buffer), tempFile))
-            {
-                fputs(buffer, ListingFile);
-            }
-
-            fclose(tempFile);
-            fclose(ListingFile);
-            fopen_s(&ListingFile, "ListingFile.txt", "r");
+            fprintf(ListingFile, "%s\tOBJ_CODE\n", lineCopy);
             firstLine = false;
             continue;
         }
@@ -366,6 +339,7 @@ int main()
         }
         if (strcmp(OPCODE, "START") == 0)
         {
+            fprintf(ObjectCode, "H%s\t%06s%06d", LABEL, ADDRESS, LOCCTR - atoi(ADDRESS));
             continue;
         }
 
@@ -385,7 +359,26 @@ int main()
             }
             else if (OPERAND[0] == 'X')
             {
-                OPCODEINT = (OPERAND[2] - '0') * 10 + (OPERAND[3] - '0');
+                int digit1, digit2;
+
+                // Convert the first hex character
+                if (OPERAND[2] >= '0' && OPERAND[2] <= '9')
+                    digit1 = OPERAND[2] - '0';
+                else if (OPERAND[2] >= 'A' && OPERAND[2] <= 'F')
+                    digit1 = OPERAND[2] - 'A' + 10;
+                else if (OPERAND[2] >= 'a' && OPERAND[2] <= 'f')
+                    digit1 = OPERAND[2] - 'a' + 10;
+
+                // Convert the second hex character
+                if (OPERAND[3] >= '0' && OPERAND[3] <= '9')
+                    digit2 = OPERAND[3] - '0';
+                else if (OPERAND[3] >= 'A' && OPERAND[3] <= 'F')
+                    digit2 = OPERAND[3] - 'A' + 10;
+                else if (OPERAND[3] >= 'a' && OPERAND[3] <= 'f')
+                    digit2 = OPERAND[3] - 'a' + 10;
+
+                // Combine the two digits to form the final OPCODEINT value
+                OPCODEINT = digit1 * 16 + digit2;
             }
             else
             {
@@ -408,6 +401,11 @@ int main()
         objectCodes[objCodeCount].addr = ADDR;
         objCodeCount++;
         
+        if (strcmp(OPCODE, "END") == 0)
+        {
+            fprintf(ObjectCode, "\nE");
+            break;
+        }
     }
 
     FILE* tempFile;
