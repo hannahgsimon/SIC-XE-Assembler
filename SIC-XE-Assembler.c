@@ -66,6 +66,10 @@ static SIC_OPTAB OPTAB[] =
 
 int isValidOpcode(char* OPCODE)
 {
+    if (OPCODE[0] == '+')
+    {
+        OPCODE = OPCODE + 1;
+    }
     for (int i = 0; i < OPTAB_SIZE; i++)
     {
         if (strcmp(OPTAB[i].Mnemonic, OPCODE) == 0)
@@ -145,6 +149,10 @@ int getSymbolAddress(char* name)
     {
         name[strlen(name) - 2] = '\0';
     }
+    else if (name[0] == '@' || name[0] == '#')
+    {
+        memmove(name, name + 1, strlen(name));
+    }
     for (int i = 0; i < symbolCount; i++)
     {
         if (strcmp(symbolTable[i].name, name) == 0)
@@ -184,7 +192,7 @@ const char* getRegisterCode(char letter) {
 
 writeToIntermediateFile(FILE* IntermediateFile, int LOCCTR, char* LABEL, char* OPCODE, char* OPERAND, bool isOpcode)
 {
-    fprintf(IntermediateFile, "%d\t%d\t%s\t%s\t%s",
+    fprintf(IntermediateFile, "%d\t%X\t%s\t%s\t%s",
         lineNumber,
         LOCCTR,
         (LABEL != NULL) ? LABEL : "",
@@ -196,7 +204,7 @@ writeToObjectFile(FILE* ObjectFile, char* buffer)
 {
     int result = (strlen(buffer) - 9 + 1) / 2;  // +1 for rounding up
     char resultChars[3];
-    sprintf_s(resultChars, sizeof(resultChars), "%02d", result); //use X here instead for hex
+    sprintf_s(resultChars, sizeof(resultChars), "%02X", result);
     buffer[7] = resultChars[0];
     buffer[8] = resultChars[1];
     fprintf(ObjectFile, "%s\n", buffer);
@@ -262,44 +270,66 @@ char* binaryToHex(char* binary)
 {
     int len = strlen(binary);
     int hexLen = (len + 3) / 4;
-    static char hexString[32];
+    char* hexString = malloc(hexLen + 1);
     hexString[hexLen] = '\0';
 
-    int j = 0;
-    for (int i = len - 4; i >= 0; i -= 4)
-    {
-        int value = 0;
-        // Get the 4-bit binary chunk and convert it to a decimal value
-        for (int k = 0; k < 4; k++)
-        {
-            value += (binary[i + k] - '0') * pow(2, 3 - k);
-        }
-        // Store the hex character
-        if (value < 10)
-        {
-            hexString[j++] = value + '0';
-        }
-        else
-        {
-            hexString[j++] = value - 10 + 'A';
-        }
-    }
+    int value = 0;
+    int j = hexLen - 1;
 
-    // Handle the remaining bits (if any)
-    int remainingBits = len % 4;
-    if (remainingBits > 0)
+    // Process binary string from right to left, 4 bits at a time
+    for (int i = len - 1; i >= 0; i -= 4)
     {
-        int value = 0;
-        for (int i = 0; i < remainingBits; i++)
+        value = 0;
+        // Convert each 4-bit chunk to a decimal value
+        for (int k = 0; k < 4 && (i - k) >= 0; k++)
         {
-            value += (binary[i] - '0') * pow(2, remainingBits - i - 1);
+            if (binary[i - k] == '1')
+            {
+                value += (1 << k);
+            }
         }
-        hexString[j++] = (value < 10) ? value + '0' : value - 10 + 'A';
+        // Store the corresponding hex character
+        hexString[j--] = (value < 10) ? (value + '0') : (value - 10 + 'A');
     }
-
     return hexString;
 }
 
+char* hexToBinary(const char* hex) {
+    int len = strlen(hex);
+    // Allocate enough space for the binary result (4 bits per hex digit)
+    char* binary = malloc(len * 4 + 1);
+    if (binary == NULL) {
+        return NULL;  // Error handling if malloc fails
+    }
+    binary[0] = '\0';  // Initialize the binary string as an empty string
+
+    // Map each hex character to its 4-bit binary equivalent
+    for (int i = 0; i < len; i++) {
+        switch (hex[i]) {
+        case '0': strcat_s(binary, len * 4 + 1, "0000"); break;
+        case '1': strcat_s(binary, len * 4 + 1, "0001"); break;
+        case '2': strcat_s(binary, len * 4 + 1, "0010"); break;
+        case '3': strcat_s(binary, len * 4 + 1, "0011"); break;
+        case '4': strcat_s(binary, len * 4 + 1, "0100"); break;
+        case '5': strcat_s(binary, len * 4 + 1, "0101"); break;
+        case '6': strcat_s(binary, len * 4 + 1, "0110"); break;
+        case '7': strcat_s(binary, len * 4 + 1, "0111"); break;
+        case '8': strcat_s(binary, len * 4 + 1, "1000"); break;
+        case '9': strcat_s(binary, len * 4 + 1, "1001"); break;
+        case 'A': case 'a': strcat_s(binary, len * 4 + 1, "1010"); break;
+        case 'B': case 'b': strcat_s(binary, len * 4 + 1, "1011"); break;
+        case 'C': case 'c': strcat_s(binary, len * 4 + 1, "1100"); break;
+        case 'D': case 'd': strcat_s(binary, len * 4 + 1, "1101"); break;
+        case 'E': case 'e': strcat_s(binary, len * 4 + 1, "1110"); break;
+        case 'F': case 'f': strcat_s(binary, len * 4 + 1, "1111"); break;
+        default:
+            free(binary);
+            return NULL; // Return NULL if an invalid character is found
+        }
+    }
+
+    return binary; // Return the constructed binary string
+}
 //int main(int argc, char* argv[])
 int main()
 {
@@ -366,7 +396,7 @@ int main()
             {
                 LOCCTR = atoi(OPERAND);
             }
-            fprintf(IntermediateFile, "%d\t%d\t%s\t%s\t%s\n", lineNumber, LOCCTR, LABEL, OPCODE, OPERAND);
+            fprintf(IntermediateFile, "%d\t%X\t%s\t%s\t%s\n", lineNumber, LOCCTR, LABEL, OPCODE, OPERAND);
             if (LABEL != NULL)
             {
                 addSymbol(LABEL, LOCCTR);
@@ -383,10 +413,6 @@ int main()
         {
             bool isDirective = false;
             bool isOpcode = false;
-            if (OPCODE[0] == '+')
-            {
-                memmove(OPCODE, OPCODE + 1, strlen(OPCODE));    // Shift the string to the left by one to remove the '+'
-            }
             if (isValidDirective(OPCODE))
             {
                 isDirective = true;
@@ -526,7 +552,7 @@ int main()
         char objectCode[33];
         char format = getFormat(OPCODE);
 
-        if (strcmp(OPERAND, "BUFFER,X") == 0)
+        if (strcmp(OPCODE, "LDB") == 0)
         {
             int y = 3;
         }
@@ -534,14 +560,7 @@ int main()
         if (strcmp(OPCODE, "BASE") == 0)
         {
             baseSet = true;
-            long int currentPos = ftell(IntermediateFile);  // Save the current file position
-            if (fgets(nextLine, sizeof(nextLine), IntermediateFile))
-            {
-                LINE2 = strtok_s(nextLine, "\t\n", &context);
-                ADDRESS2 = strtok_s(NULL, " \t\n", &context);
-            }
-            baseAddress = atoi(ADDRESS2);
-            fseek(IntermediateFile, currentPos, SEEK_SET);
+            baseAddress = getSymbolAddress(OPERAND);
             continue;
         }
         else if (strcmp(OPCODE, "NOBASE") == 0)
@@ -596,7 +615,7 @@ int main()
         else if (format == '1')
         {
             OPCODEINT = getMachineCode(OPCODE);
-            snprintf(objectCode, sizeof(objectCode), "%d", OPCODEINT);
+            snprintf(objectCode, sizeof(objectCode), "%02X", OPCODEINT);
         }
         else if (format == '2')
         {
@@ -604,61 +623,48 @@ int main()
             if (strlen(OPERAND) == 1)
             {
                 int code = binaryToInt(getRegisterCode(OPERAND[0]));
-                snprintf(objectCode, sizeof(objectCode), "%08d%04d", OPCODEINT, code); // 8 bits for OPCODEINT and 4 for RegisterCode
+                snprintf(objectCode, sizeof(objectCode), "%02X%02X00", OPCODEINT, code);
             }
             else if (strlen(OPERAND) == 3)
                 {
                 int code1 = binaryToInt(getRegisterCode(OPERAND[0]));
                 int code2 = binaryToInt(getRegisterCode(OPERAND[2]));
-                snprintf(objectCode, sizeof(objectCode), "%08d%04d%04d", OPCODEINT, code1, code2);
+                snprintf(objectCode, sizeof(objectCode), "%02X%02X%02X", OPCODEINT, code1, code2);
             }
         }
         else if (format == '3')
         {
             char binaryString[13];
-            int g = (getMachineCode(OPCODE));
-            printf("%X\n", (getMachineCode(OPCODE)));
             char* OPCODECHAR = intToBinary(getMachineCode(OPCODE));
-            printf("%s\n", OPCODECHAR);
             OPCODECHAR[strlen(OPCODECHAR) - 2] = '\0';
-            printf("%s\n", OPCODECHAR);
            
-            if (OPERAND != NULL && OPERAND[0] == '#')
+            if (OPERAND != NULL && OPERAND[0] == '#' && strcmp(OPERAND + 1, "LENGTH") != 0)
             {
                 int number = atoi(OPERAND + 1);
+                //check if number is in hex
                 
                 if (0 <= number <= 4095)
                 {
                     snprintf(binaryString, sizeof(binaryString), "%s010000", OPCODECHAR);
                     char* hexString = binaryToHex(binaryString);
-                    printf("%s\n", hexString);
-                    snprintf(objectCode, sizeof(objectCode), "%s%d", hexString, number);
-                    printf("%s\n", objectCode);
-                    break;
+                    snprintf(objectCode, sizeof(objectCode), "%03s%03X", hexString, number);
                 }
                 else if (4096 <= number <= 1048575 && OPCODE[0] == '+')
                 {
                     snprintf(binaryString, sizeof(binaryString), "%s010001", OPCODECHAR);
                     char* hexString = binaryToHex(binaryString);
-                    snprintf(objectCode, sizeof(objectCode), "%s%d", hexString, number);
-
+                    snprintf(objectCode, sizeof(objectCode), "%03s%03X", hexString, number);
                 }
                 else
                 {
                     printf("Error: Pass 2, Line %s: Immediate number out of range %s\n", LINE, OPERAND);
-                    //add exit statements for errors
+                    exit(EXIT_FAILURE);
+                    //add exit statements for all errors in pass 2
                 }
             }
             else if (OPERAND != NULL)
             {
-                if (OPERAND[0] == '@')
-                {
-                    ADDR = getSymbolAddress(&OPERAND[1]);
-                }
-                else
-                {
-                    ADDR = getSymbolAddress(OPERAND);
-                }
+                ADDR = getSymbolAddress(OPERAND);
                 if (ADDR == NULL)
                 {
                     printf("Error: Pass 2, Line %s: Symbol not found %s\n", LINE, OPERAND);
@@ -675,52 +681,62 @@ int main()
                 {
                     snprintf(binaryString, sizeof(binaryString), "%s110001", OPCODECHAR);
                     char* hexString = binaryToHex(binaryString);
-                    snprintf(objectCode, sizeof(objectCode), "%s%d", hexString, ADDR);
+                    snprintf(objectCode, sizeof(objectCode), "%s%03X", hexString, ADDR);
                 }
 
                 else if (-2048 <= ADDR - atoi(ADDRESS2) <= 2047)
                 {
                     snprintf(binaryString, sizeof(binaryString), "%s110010", OPCODECHAR);
-                    //printf("%s\n", binaryString);
-                    //break;
                     char* hexString = binaryToHex(binaryString);
                     int displacement = ADDR - atoi(ADDRESS2);
-                    snprintf(objectCode, sizeof(objectCode), "%s%d", hexString, displacement);
+                    snprintf(objectCode, sizeof(objectCode), "%03s%03X", hexString, displacement);
                 }
                 else if (baseSet && 0 <= ADDR - baseAddress <= 4095)
                 {
                     snprintf(binaryString, sizeof(binaryString), "%s110100", OPCODECHAR);
                     char* hexString = binaryToHex(binaryString);
                     int displacement = ADDR - baseAddress;
-                    snprintf(objectCode, sizeof(objectCode), "%s%d", hexString, displacement);
+                    snprintf(objectCode, sizeof(objectCode), "%03s%03X", hexString, displacement);
                 }
                 else
                 {
-                    printf("Error: Pass 2, Line %s: Instruction addressing error\n", LINE);
-                }
-
-                if (OPERAND[0] == '#')
-                {
-                    objectCode[7] = 0;
-                }
-                else if (OPERAND[0] == '@')
-                {
-                    objectCode[8] = 0;
-                }
-                else if (strlen(OPERAND) >= 2 && OPERAND[strlen(OPERAND) - 2] == ',' && OPERAND[strlen(OPERAND) - 1] == 'X')
-                {
-                    objectCode[9] = 1;
+                    printf("Error: Pass 2, Line %s: Instruction addressing error %s\n", LINE, lineCopy);
+                    exit(EXIT_FAILURE);
                 }
             }
             else
             {
-                snprintf(objectCode, sizeof(objectCode), "%d%s", OPCODEINT, binaryToHex("110000000000000000"));
+                snprintf(binaryString, sizeof(binaryString), "%s110000", OPCODECHAR);
+                char* hexString = binaryToHex(binaryString);
+                snprintf(objectCode, sizeof(objectCode), "%03s000", hexString);
+            }
+            if (OPERAND != NULL)
+            {
+                if (OPERAND[0] == '#')
+                {
+                    char* objectCodeHex = hexToBinary(objectCode);
+                    objectCodeHex[6] = '0';
+                    snprintf(objectCode, sizeof(objectCode), "%s", binaryToHex(objectCodeHex));
+                }
+                else if (OPERAND[0] == '@')
+                {
+                    char* objectCodeHex = hexToBinary(objectCode);
+                    objectCode[7] = '0';
+                    snprintf(objectCode, sizeof(objectCode), "%s", binaryToHex(objectCodeHex));
+                }
+                else if (strlen(OPERAND) >= 2 && OPERAND[strlen(OPERAND) - 2] == ',' && OPERAND[strlen(OPERAND) - 1] == 'X')
+                {
+                    char* objectCodeHex = hexToBinary(objectCode);
+                    objectCode[8] = '1';
+                    snprintf(objectCode, sizeof(objectCode), "%s", binaryToHex(objectCodeHex));
+                }
             }
             printf("%s\t%s\n", lineCopy, objectCode);
         }
-        else
+        else if (strcmp(OPCODE, "END") != 0)
         {
-            printf("error %s", LINE);
+            printf("Error: Pass 2, Line %s: Invalid format for opcode '%s'\n", LINE, OPCODE);
+            exit(EXIT_FAILURE);
         }
         
         fprintf(ListingFile, "%s\t%s\n", lineCopy, objectCode);
