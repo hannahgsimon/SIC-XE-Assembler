@@ -2,9 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include <malloc.h>
 
-const char* DIRECTIVES[] = {"BYTE", "WORD", "RESB", "RESW", "END", "BASE", "NOBASE" };
+const char* DIRECTIVES[] = {"BYTE", "WORD", "RESB", "RESW", "END", "BASE", "NOBASE"};
 #define DIRECTIVES_SIZE (sizeof(DIRECTIVES) / sizeof(DIRECTIVES[0]))
 
 int isValidDirective(const char* OPCODE)
@@ -21,44 +20,46 @@ int isValidDirective(const char* OPCODE)
 
 typedef struct OperationCodeTable
 {
-    char Mnemonic[5];
+    char Mnemonic[6];
     char Format;
     unsigned short int MachineCode;
+    unsigned short int NumberOperands;
 }SIC_OPTAB;
 
 static SIC_OPTAB OPTAB[] =
 {
-    {   "ADD",  '3',  0x18},
-    //{  "ADDR",  '2',  0x90},
-    //{ "CLEAR",  '2',  0xB4},
-    {  "COMP",  '3',  0x28},
-    //{ "COMPR",  '2',  0xA0},
-    {   "DIV",  '3',  0x24},
-    {     "J",  '3',  0x3C},
-    {   "JEQ",  '3',  0x30},
-    {   "JGT",  '3',  0x34},
-    {   "JLT",  '3',  0x38},
-    {  "JSUB",  '3',  0x48},
-    {   "LDA",  '3',  0x00},
-    //{   "LDB",  '3',  0x68},
-    {  "LDCH",  '3',  0x50},
-    {   "LDL",  '3',  0x08},
-    //{   "LDT",  '3',  0x74},
-    {   "LDX",  '3',  0x04},
-    {   "MUL",  '3',  0x20},
-    {    "RD",  '3',  0xD8},
-    {  "RSUB",  '3',  0x4C},
-    {   "STA",  '3',  0x0C},
-    //{   "STB",  '3',  0x78},
-    {  "STCH",  '3',  0x54},
-    {   "STL",  '3',  0x14},
-    {  "STSW",  '3',  0xE8},
-    {   "STX",  '3',  0x10},
-    {   "SUB",  '3',  0x1C},
-    //{   "SUBR",  '2', 0x94},
-    {    "TD",  '3',  0xE0},
-    {   "TIX",  '3',  0x2C},
-    {    "WD",  '3',  0xDC},
+    {   "ADD",  '3',  0x18, 1},
+    {  "ADDR",  '2',  0x90, 2},
+    { "CLEAR",  '2',  0xB4, 1},
+    {  "COMP",  '3',  0x28, 1},
+    { "COMPR",  '2',  0xA0, 2},
+    {   "DIV",  '3',  0x24, 1},
+    {     "J",  '3',  0x3C, 1},
+    {   "JEQ",  '3',  0x30, 1},
+    {   "JGT",  '3',  0x34, 1},
+    {   "JLT",  '3',  0x38, 1},
+    {  "JSUB",  '3',  0x48, 1},
+    {   "LDA",  '3',  0x00, 1},
+    {   "LDB",  '3',  0x68, 1},
+    {  "LDCH",  '3',  0x50, 1},
+    {   "LDL",  '3',  0x08, 1},
+    {   "LDT",  '3',  0x74, 1},
+    {   "LDX",  '3',  0x04, 1},
+    {   "MUL",  '3',  0x20, 1},
+    {    "RD",  '3',  0xD8, 1},
+    {  "RSUB",  '3',  0x4C, 0},
+    {   "STA",  '3',  0x0C, 1},
+    {   "STB",  '3',  0x78, 1},
+    {  "STCH",  '3',  0x54, 1},
+    {   "STL",  '3',  0x14, 1},
+    {  "STSW",  '3',  0xE8, 1},
+    {   "STX",  '3',  0x10, 1},
+    {   "SUB",  '3',  0x1C, 1},
+    {   "SUBR", '2',  0x94, 2},
+    {    "TD",  '3',  0xE0, 1},
+    {   "TIX",  '3',  0x2C, 1},
+    {   "TIXR", '2',  0xB8, 1},
+    {    "WD",  '3',  0xDC, 1},
 };
 
 #define OPTAB_SIZE (sizeof(OPTAB) / sizeof(SIC_OPTAB))
@@ -86,6 +87,23 @@ unsigned short int getMachineCode(const char* OPCODE)
     }
     return NULL; // Return NULL if opcode not found
 }
+
+char getFormat(const char* OPCODE)
+{
+    if (OPCODE[0] == '+')
+    {
+        OPCODE = OPCODE + 1;
+    }
+    for (int i = 0; i < OPTAB_SIZE; i++)
+    {
+        if (strcmp(OPTAB[i].Mnemonic, OPCODE) == 0)
+        {
+            return OPTAB[i].Format;
+        }
+    }
+    return 0; // Return 0 if opcode not found
+}
+
 
 typedef struct Symbol
 {
@@ -121,8 +139,12 @@ void addSymbol(const char* LABEL, unsigned short int address)
     symbolCount++;
 }
 
-int getSymbolAddress(const char* name)
+int getSymbolAddress(char* name)
 {
+    if (strlen(name) >= 2 && name[strlen(name) - 2] == ',' && name[strlen(name) - 1] == 'X')
+    {
+        name[strlen(name) - 2] = '\0';
+    }
     for (int i = 0; i < symbolCount; i++)
     {
         if (strcmp(symbolTable[i].name, name) == 0)
@@ -133,6 +155,124 @@ int getSymbolAddress(const char* name)
     return NULL;
 }
 
+const char* RegisterCodes[] = {
+    "0000", // A
+    "0001", // X
+    "0010", // L
+    "0011", // B
+    "0100", // S
+    "0101", // T
+    "0110", // F
+    "1000", // PC
+    "1001"  // SW
+};
+
+const char* getRegisterCode(char letter) {
+    switch (letter) {
+    case 'A': return RegisterCodes[0];
+    case 'X': return RegisterCodes[1];
+    case 'L': return RegisterCodes[2];
+    case 'B': return RegisterCodes[3];
+    case 'S': return RegisterCodes[4];
+    case 'T': return RegisterCodes[5];
+    case 'F': return RegisterCodes[6];
+    case 'P': return RegisterCodes[7];
+    case 'W': return RegisterCodes[8];
+    default: return NULL;
+    }
+}
+
+writeToIntermediateFile(FILE* IntermediateFile, int LOCCTR, char* LABEL, char* OPCODE, char* OPERAND, bool isOpcode)
+{
+    fprintf(IntermediateFile, "%d\t%d\t%s\t%s\t%s",
+        lineNumber,
+        LOCCTR,
+        (LABEL != NULL) ? LABEL : "",
+        (OPCODE != NULL) ? OPCODE : "",
+        (OPERAND != NULL) ? OPERAND : "");
+}
+
+writeToObjectFile(FILE* ObjectFile, char* buffer)
+{
+    int result = (strlen(buffer) - 9 + 1) / 2;  // +1 for rounding up
+    char resultChars[3];
+    sprintf_s(resultChars, sizeof(resultChars), "%02d", result); //use X here instead for hex
+    buffer[7] = resultChars[0];
+    buffer[8] = resultChars[1];
+    fprintf(ObjectFile, "%s\n", buffer);
+    memset(buffer, 0, sizeof(buffer));
+}
+
+char* intToBinary(int n)
+{
+    char* binaryString = malloc(8);
+    binaryString[8] = '\0';
+
+    for (int i = 7; i >= 0; i--)
+    {
+        binaryString[i] = (n & 1) ? '1' : '0';
+        n >>= 1;
+    }
+    return binaryString;
+}
+
+int binaryToInt(const char* binaryString)
+{
+    int result = 0;
+    int length = strlen(binaryString);
+
+    for (int i = 0; i < length; i++)
+    {
+        result <<= 1; // Shift left by 1 (equivalent to multiplying by 2)
+        if (binaryString[i] == '1')
+        {
+            result |= 1; // Set the least significant bit if the character is '1'
+        }
+    }
+    return result;
+}
+
+char* binaryToHex(char* binary)
+{
+    int len = strlen(binary);
+    int hexLen = (len + 3) / 4;
+    static char hexString[32];
+    hexString[hexLen] = '\0';
+
+    int j = 0;
+    for (int i = len - 4; i >= 0; i -= 4)
+    {
+        int value = 0;
+        // Get the 4-bit binary chunk and convert it to a decimal value
+        for (int k = 0; k < 4; k++)
+        {
+            value += (binary[i + k] - '0') * pow(2, 3 - k);
+        }
+        // Store the hex character
+        if (value < 10)
+        {
+            hexString[j++] = value + '0';
+        }
+        else
+        {
+            hexString[j++] = value - 10 + 'A';
+        }
+    }
+
+    // Handle the remaining bits (if any)
+    int remainingBits = len % 4;
+    if (remainingBits > 0)
+    {
+        int value = 0;
+        for (int i = 0; i < remainingBits; i++)
+        {
+            value += (binary[i] - '0') * pow(2, remainingBits - i - 1);
+        }
+        hexString[j++] = (value < 10) ? value + '0' : value - 10 + 'A';
+    }
+
+    return hexString;
+}
 
 //int main(int argc, char* argv[])
 int main()
@@ -151,7 +291,7 @@ int main()
         return EXIT_FAILURE;
     }*/
 
-    FILE* file = fopen("C:\\Users\\Hannah\\Dropbox\\2024 Fall\\CIS335 Language Processors\\Assignments\\Assignment 4\\SIC_PROG.txt", "r");
+    FILE* file = fopen("C:\\Users\\Hannah\\Dropbox\\2024 Fall\\CIS335 Language Processors\\Assignments\\Assignment 4\\SIC_XE_PROG.txt", "r");
     if (file == NULL)
     {
         perror("Error opening file");
@@ -167,7 +307,7 @@ int main()
     FILE* IntermediateFile = fopen("IntermediateFile.txt", "w");
     FILE* ListingFile = fopen("ListingFile.txt", "w");
     FILE* ObjectFile = fopen("ObjectCode.txt", "w");
-    
+
     fprintf(IntermediateFile, "LINE\tLOCCTR\tSOURCE_STATEMENT\n");
 
     //Pass 1
@@ -208,16 +348,19 @@ int main()
             firstLine = false;
             continue;
         }
-        
+
         if (LABEL != NULL)
         {
             addSymbol(LABEL, LOCCTR);
         }
-
         if (strcmp(OPCODE, "START") != 0)
         {
             bool isDirective = false;
             bool isOpcode = false;
+            if (OPCODE[0] == '+')
+            {
+                memmove(OPCODE, OPCODE + 1, strlen(OPCODE));    // Shift the string to the left by one to remove the '+'
+            }
             if (isValidDirective(OPCODE))
             {
                 isDirective = true;
@@ -263,7 +406,27 @@ int main()
                 isOpcode = true;
                 writeToIntermediateFile(IntermediateFile, LOCCTR, LABEL, OPCODE, OPERAND, isOpcode);
                 fprintf(IntermediateFile, "\n");
-                LOCCTR += 3;
+                char format = getFormat(OPCODE);
+                if (format == '1')
+                {
+                    LOCCTR += 1;
+                }
+                else if (format == '2')
+                {
+                    LOCCTR += 2;
+                }
+                else if (format == '3' && OPCODE[0] != '+')
+                {
+                    LOCCTR += 3;
+                }
+                else if (format == '3' && OPCODE[0] == '+')
+                {
+                    LOCCTR += 4;
+                }
+                else
+                {
+                    printf("Error: Pass 1, Line %d: Invalid format for opcode '%s'\n", lineNumber, OPCODE);
+                }
             }
             else
             {
@@ -276,7 +439,8 @@ int main()
     fclose(IntermediateFile);
     fopen_s(IntermediateFile, "IntermediateFile.txt", "r");
     char* LINE = NULL, * ADDRESS = NULL;
-    firstLine = true;
+    firstLine = true; char* LINE2 = NULL, * ADDRESS2 = NULL; bool baseSet = false; int baseAddress = NULL;
+    char nextLine[256] = { 0 };
     char buffer[70] = { 0 };
 
     // PASS 2
@@ -333,22 +497,33 @@ int main()
 
         unsigned short int OPCODEINT = NULL;
         int ADDR = NULL;
-        char objectCode[8];
+        char objectCode[33];
+        char format = getFormat(OPCODE);
 
-        if (OPERAND != NULL && strcmp(OPERAND, "BUFFER,X") == 0)
+        if (strcmp(OPERAND, "BUFFER,X") == 0)
         {
-            OPCODEINT = getMachineCode(OPCODE);
-            ADDR = getSymbolAddress("BUFFER");
-            char addrStr[5];
-            snprintf(addrStr, sizeof(addrStr), "%04d", ADDR);
-            int firstDigit = addrStr[0] - '0';
-            firstDigit &= 0x07;
-            firstDigit |= 0x08;
-            addrStr[0] = firstDigit + '0';
-            ADDR = atoi(addrStr);
-
-            sprintf_s(objectCode, sizeof(objectCode), "%02d%04d", OPCODEINT, ADDR);
+            int y = 3;
         }
+        
+        if (strcmp(OPCODE, "BASE") == 0)
+        {
+            baseSet = true;
+            long int currentPos = ftell(IntermediateFile);  // Save the current file position
+            if (fgets(nextLine, sizeof(nextLine), IntermediateFile))
+            {
+                LINE2 = strtok_s(nextLine, "\t\n", &context);
+                ADDRESS2 = strtok_s(NULL, " \t\n", &context);
+            }
+            baseAddress = atoi(ADDRESS2);
+            fseek(IntermediateFile, currentPos, SEEK_SET);
+            continue;
+        }
+        else if (strcmp(OPCODE, "NOBASE") == 0)
+        {
+            baseSet = false;
+            continue;
+        }
+
         else if (strcmp(OPCODE, "RESW") == 0 || strcmp(OPCODE, "RESB") == 0)
         {
             fprintf(ListingFile, "%s\n", lineCopy);
@@ -391,22 +566,134 @@ int main()
                 exit(EXIT_FAILURE);
             }
         }
-        else if (OPERAND != NULL)
+  
+        else if (format == '1')
         {
             OPCODEINT = getMachineCode(OPCODE);
-            ADDR = getSymbolAddress(OPERAND);
-            if (ADDR == NULL)
+            snprintf(objectCode, sizeof(objectCode), "%d", OPCODEINT);
+        }
+        else if (format == '2')
+        {
+            OPCODEINT = getMachineCode(OPCODE);
+            if (strlen(OPERAND) == 1)
             {
-                printf("Error: Pass 2, Line %s: Symbol not found %s\n", LINE, OPERAND);
+                int code = binaryToInt(getRegisterCode(OPERAND[0]));
+                snprintf(objectCode, sizeof(objectCode), "%08d%04d", OPCODEINT, code); // 8 bits for OPCODEINT and 4 for RegisterCode
             }
-            sprintf_s(objectCode, sizeof(objectCode), "%02d%04d", OPCODEINT, ADDR);
+            else if (strlen(OPERAND) == 3)
+                {
+                int code1 = binaryToInt(getRegisterCode(OPERAND[0]));
+                int code2 = binaryToInt(getRegisterCode(OPERAND[2]));
+                snprintf(objectCode, sizeof(objectCode), "%08d%04d%04d", OPCODEINT, code1, code2);
+            }
         }
-        else if (OPERAND == NULL)
+        else if (format == '3')
         {
-            OPCODEINT = getMachineCode(OPCODE);
-            ADDR = 0000;
-            sprintf_s(objectCode, sizeof(objectCode), "%02d%04d", OPCODEINT, ADDR);
+            char binaryString[13];
+            printf("%d\n", (getMachineCode(OPCODE)));
+            char* OPCODECHAR = intToBinary(getMachineCode(OPCODE));
+            printf("%s\n", OPCODECHAR);
+            OPCODECHAR[strlen(OPCODECHAR) - 2] = '\0';
+            printf("%s\n", OPCODECHAR);
+            break;
+           
+            if (OPERAND != NULL && OPERAND[0] == '#')
+            {
+                int number = atoi(OPERAND + 1);
+                
+                if (0 <= number <= 4095)
+                {
+                    snprintf(binaryString, sizeof(binaryString), "%s010000", OPCODECHAR);
+                    char* hexString = binaryToHex(binaryString);
+                    snprintf(objectCode, sizeof(objectCode), "%s%d", hexString, number);
+                }
+                else if (4096 <= number <= 1048575 && OPCODE[0] == '+')
+                {
+                    snprintf(binaryString, sizeof(binaryString), "%s010001", OPCODECHAR);
+                    char* hexString = binaryToHex(binaryString);
+                    snprintf(objectCode, sizeof(objectCode), "%s%d", hexString, number);
+
+                }
+                else
+                {
+                    printf("Error: Pass 2, Line %s: Immediate number out of range %s\n", LINE, OPERAND);
+                    //add exit statements for errors
+                }
+            }
+            else if (OPERAND != NULL)
+            {
+                if (OPERAND[0] == '@')
+                {
+                    ADDR = getSymbolAddress(&OPERAND[1]);
+                }
+                else
+                {
+                    ADDR = getSymbolAddress(OPERAND);
+                }
+                if (ADDR == NULL)
+                {
+                    printf("Error: Pass 2, Line %s: Symbol not found %s\n", LINE, OPERAND);
+                }
+                long int currentPos = ftell(IntermediateFile);  // Save the current file position
+                if (fgets(nextLine, sizeof(nextLine), IntermediateFile))
+                {
+                    LINE2 = strtok_s(nextLine, "\t\n", &context);
+                    ADDRESS2 = strtok_s(NULL, " \t\n", &context);
+                }
+                fseek(IntermediateFile, currentPos, SEEK_SET);
+
+                if (OPCODE[0] == '+')
+                {
+                    snprintf(binaryString, sizeof(binaryString), "%s110001", OPCODECHAR);
+                    char* hexString = binaryToHex(binaryString);
+                    snprintf(objectCode, sizeof(objectCode), "%s%d", hexString, ADDR);
+                }
+
+                else if (-2048 <= ADDR - atoi(ADDRESS2) <= 2047)
+                {
+                    snprintf(binaryString, sizeof(binaryString), "%s110010", OPCODECHAR);
+                    //printf("%s\n", binaryString);
+                    //break;
+                    char* hexString = binaryToHex(binaryString);
+                    int displacement = ADDR - atoi(ADDRESS2);
+                    snprintf(objectCode, sizeof(objectCode), "%s%d", hexString, displacement);
+                }
+                else if (baseSet && 0 <= ADDR - baseAddress <= 4095)
+                {
+                    snprintf(binaryString, sizeof(binaryString), "%s110100", OPCODECHAR);
+                    char* hexString = binaryToHex(binaryString);
+                    int displacement = ADDR - baseAddress;
+                    snprintf(objectCode, sizeof(objectCode), "%s%d", hexString, displacement);
+                }
+                else
+                {
+                    printf("Error: Pass 2, Line %s: Instruction addressing error\n", LINE);
+                }
+
+                if (OPERAND[0] == '#')
+                {
+                    objectCode[7] = 0;
+                }
+                else if (OPERAND[0] == '@')
+                {
+                    objectCode[8] = 0;
+                }
+                else if (strlen(OPERAND) >= 2 && OPERAND[strlen(OPERAND) - 2] == ',' && OPERAND[strlen(OPERAND) - 1] == 'X')
+                {
+                    objectCode[9] = 1;
+                }
+            }
+            else
+            {
+                snprintf(objectCode, sizeof(objectCode), "%d%s", OPCODEINT, binaryToHex("110000000000000000"));
+            }
+            printf("%s\t%s\n", lineCopy, objectCode);
         }
+        else
+        {
+            printf("error %s", LINE);
+        }
+        
         fprintf(ListingFile, "%s\t%s\n", lineCopy, objectCode);
 
         if (strcmp(OPCODE, "END") == 0)
@@ -451,25 +738,4 @@ int main()
     fclose(ObjectFile);
     fclose(file);
     return 0;
-}
-
-writeToIntermediateFile(FILE* IntermediateFile, int LOCCTR, char* LABEL, char* OPCODE, char* OPERAND, bool isOpcode)
-{
-    fprintf(IntermediateFile, "%d\t%d\t%s\t%s\t%s",
-        lineNumber,
-        LOCCTR,
-        (LABEL != NULL) ? LABEL : "",
-        (OPCODE != NULL) ? OPCODE : "",
-        (OPERAND != NULL) ? OPERAND : "");
-}
-
-writeToObjectFile(FILE* ObjectFile, char *buffer)
-{
-    int result = (strlen(buffer) - 9 + 1) / 2;  // +1 for rounding up
-    char resultChars[3];
-    sprintf_s(resultChars, sizeof(resultChars), "%02d", result); //use X here instead for hex
-    buffer[7] = resultChars[0];
-    buffer[8] = resultChars[1];
-    fprintf(ObjectFile, "%s\n", buffer);
-    memset(buffer, 0, sizeof(buffer));
 }
