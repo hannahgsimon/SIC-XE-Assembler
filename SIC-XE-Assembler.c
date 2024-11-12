@@ -205,14 +205,40 @@ writeToObjectFile(FILE* ObjectFile, char* buffer)
 
 char* intToBinary(int n)
 {
-    char* binaryString = malloc(8);
-    binaryString[8] = '\0';
+    static char hexString[9];
+    sprintf_s(hexString, sizeof(hexString), "%X", n);
 
-    for (int i = 7; i >= 0; i--)
+    int hexLen = strlen(hexString);
+    char* binaryString = malloc(hexLen * 4 + 1);
+
+    int j = 0;
+    for (int i = 0; i < hexLen; i++)
     {
-        binaryString[i] = (n & 1) ? '1' : '0';
-        n >>= 1;
+        char hexDigit = hexString[i];
+        int value;
+
+        // Convert the hex digit to its decimal value
+        if (hexDigit >= '0' && hexDigit <= '9')
+        {
+            value = hexDigit - '0';
+        }
+        else if (hexDigit >= 'A' && hexDigit <= 'F')
+        {
+            value = hexDigit - 'A' + 10;
+        }
+        else if (hexDigit >= 'a' && hexDigit <= 'f')
+        {
+            value = hexDigit - 'a' + 10;
+        }
+
+        // Convert the value to a 4-bit binary representation
+        for (int k = 3; k >= 0; k--)
+        {
+            binaryString[j++] = (value & (1 << k)) ? '1' : '0';
+        }
     }
+
+    binaryString[j] = '\0';
     return binaryString;
 }
 
@@ -590,12 +616,12 @@ int main()
         else if (format == '3')
         {
             char binaryString[13];
-            printf("%d\n", (getMachineCode(OPCODE)));
+            int g = (getMachineCode(OPCODE));
+            printf("%X\n", (getMachineCode(OPCODE)));
             char* OPCODECHAR = intToBinary(getMachineCode(OPCODE));
             printf("%s\n", OPCODECHAR);
             OPCODECHAR[strlen(OPCODECHAR) - 2] = '\0';
             printf("%s\n", OPCODECHAR);
-            break;
            
             if (OPERAND != NULL && OPERAND[0] == '#')
             {
@@ -605,7 +631,10 @@ int main()
                 {
                     snprintf(binaryString, sizeof(binaryString), "%s010000", OPCODECHAR);
                     char* hexString = binaryToHex(binaryString);
+                    printf("%s\n", hexString);
                     snprintf(objectCode, sizeof(objectCode), "%s%d", hexString, number);
+                    printf("%s\n", objectCode);
+                    break;
                 }
                 else if (4096 <= number <= 1048575 && OPCODE[0] == '+')
                 {
