@@ -18,6 +18,7 @@ int isValidDirective(const char* OPCODE)
     return 0;
 }
 
+// Struct for an opcode containing its name, format, hex code, and number of expected operands
 typedef struct OperationCodeTable
 {
     char Mnemonic[6];
@@ -26,6 +27,7 @@ typedef struct OperationCodeTable
     unsigned short int NumberOperands;
 }SIC_OPTAB;
 
+// Table of opcodes (struct defined above)
 static SIC_OPTAB OPTAB[] =
 {
     {   "ADD",  '3',  0x18, 1},
@@ -64,8 +66,10 @@ static SIC_OPTAB OPTAB[] =
 
 #define OPTAB_SIZE (sizeof(OPTAB) / sizeof(SIC_OPTAB))
 
+// Checks if the opcode name it is sent is in the opcode table
 int isValidOpcode(char* OPCODE)
 {
+    // If opcode starts with + for format 4, ignore it
     if (OPCODE[0] == '+')
     {
         OPCODE = OPCODE + 1;
@@ -74,14 +78,20 @@ int isValidOpcode(char* OPCODE)
     {
         if (strcmp(OPTAB[i].Mnemonic, OPCODE) == 0)
         {
-            return 1; // Opcode is valid
+            return 1; // Valid opcode
         }
     }
-    return 0;
+    return 0; // Invalid opcode
 }
 
 unsigned short int getMachineCode(const char* OPCODE)
 {
+    // If opcode starts with +, skip the + character
+    if (OPCODE[0] == '+') 
+    {
+        OPCODE++;
+    }
+    
     for (int i = 0; i < OPTAB_SIZE; i++)
     {
         if (strcmp(OPTAB[i].Mnemonic, OPCODE) == 0)
@@ -89,7 +99,7 @@ unsigned short int getMachineCode(const char* OPCODE)
             return OPTAB[i].MachineCode;
         }
     }
-    return NULL; // Return NULL if opcode not found
+    return 0; // Return 0 if opcode not found
 }
 
 char getFormat(const char* OPCODE)
@@ -143,8 +153,13 @@ void addSymbol(const char* LABEL, unsigned short int address)
     symbolCount++;
 }
 
-int getSymbolAddress(char* name)
+int getSymbolAddress(char* nameInput)
 {
+    // Create a copy of the input name
+    char name[20];
+    strncpy(name, nameInput, sizeof(name) - 1);
+    name[sizeof(name) - 1] = '\0'; // Ensure null termination
+
     if (strlen(name) >= 2 && name[strlen(name) - 2] == ',' && name[strlen(name) - 1] == 'X')
     {
         name[strlen(name) - 2] = '\0';
@@ -163,7 +178,20 @@ int getSymbolAddress(char* name)
     return NULL;
 }
 
-const char* RegisterCodes[] = {
+int convertToTwosComplement(int displacement, int bits) 
+{
+    // If number is negative
+    if (displacement < 0) 
+    {
+        // Calculate two's complement
+        int mask = (1 << bits) - 1;  // Create mask for specified bits
+        displacement = ((-displacement) ^ mask) + 1;
+    }
+    return displacement;
+}
+
+const char* RegisterCodes[] = 
+{
     "0000", // A
     "0001", // X
     "0010", // L
@@ -175,8 +203,10 @@ const char* RegisterCodes[] = {
     "1001"  // SW
 };
 
-const char* getRegisterCode(char letter) {
-    switch (letter) {
+const char* getRegisterCode(char letter) 
+{
+    switch (letter) 
+    {
     case 'A': return RegisterCodes[0];
     case 'X': return RegisterCodes[1];
     case 'L': return RegisterCodes[2];
@@ -190,9 +220,9 @@ const char* getRegisterCode(char letter) {
     }
 }
 
-writeToIntermediateFile(FILE* IntermediateFile, int LOCCTR, char* LABEL, char* OPCODE, char* OPERAND, bool isOpcode)
+void writeToIntermediateFile(FILE* IntermediateFile, int LOCCTR, char* LABEL, char* OPCODE, char* OPERAND, bool isOpcode)
 {
-    fprintf(IntermediateFile, "%d\t%X\t%s\t%s\t%s",
+    fprintf(IntermediateFile, "%d\t%04X\t%s\t%s\t%s",
         lineNumber,
         LOCCTR,
         (LABEL != NULL) ? LABEL : "",
@@ -200,7 +230,7 @@ writeToIntermediateFile(FILE* IntermediateFile, int LOCCTR, char* LABEL, char* O
         (OPERAND != NULL) ? OPERAND : "");
 }
 
-writeToObjectFile(FILE* ObjectFile, char* buffer)
+void writeToObjectFile(FILE* ObjectFile, char* buffer)
 {
     int result = (strlen(buffer) - 9 + 1) / 2;  // +1 for rounding up
     char resultChars[3];
@@ -211,42 +241,23 @@ writeToObjectFile(FILE* ObjectFile, char* buffer)
     memset(buffer, 0, sizeof(buffer));
 }
 
-char* intToBinary(int n)
+char* intToBinary(int n) 
 {
-    static char hexString[9];
-    sprintf_s(hexString, sizeof(hexString), "%X", n);
-
-    int hexLen = strlen(hexString);
-    char* binaryString = malloc(hexLen * 4 + 1);
-
-    int j = 0;
-    for (int i = 0; i < hexLen; i++)
+    // Allocate enough space for 8 bits (one byte) plus null terminator
+    char* binaryString = malloc(9);
+    if (binaryString == NULL) 
     {
-        char hexDigit = hexString[i];
-        int value;
-
-        // Convert the hex digit to its decimal value
-        if (hexDigit >= '0' && hexDigit <= '9')
-        {
-            value = hexDigit - '0';
-        }
-        else if (hexDigit >= 'A' && hexDigit <= 'F')
-        {
-            value = hexDigit - 'A' + 10;
-        }
-        else if (hexDigit >= 'a' && hexDigit <= 'f')
-        {
-            value = hexDigit - 'a' + 10;
-        }
-
-        // Convert the value to a 4-bit binary representation
-        for (int k = 3; k >= 0; k--)
-        {
-            binaryString[j++] = (value & (1 << k)) ? '1' : '0';
-        }
+        return NULL;
     }
-
-    binaryString[j] = '\0';
+    
+    // Always generate 8 bits, filling from right to left
+    for (int i = 7; i >= 0; i--) 
+    {
+        binaryString[i] = (n & 1) ? '1' : '0';
+        n >>= 1;
+    }
+    binaryString[8] = '\0';
+    
     return binaryString;
 }
 
@@ -304,8 +315,10 @@ char* hexToBinary(const char* hex) {
     binary[0] = '\0';  // Initialize the binary string as an empty string
 
     // Map each hex character to its 4-bit binary equivalent
-    for (int i = 0; i < len; i++) {
-        switch (hex[i]) {
+    for (int i = 0; i < len; i++) 
+        {
+        switch (hex[i]) 
+        {
         case '0': strcat_s(binary, len * 4 + 1, "0000"); break;
         case '1': strcat_s(binary, len * 4 + 1, "0001"); break;
         case '2': strcat_s(binary, len * 4 + 1, "0010"); break;
@@ -330,12 +343,21 @@ char* hexToBinary(const char* hex) {
 
     return binary; // Return the constructed binary string
 }
-//int main(int argc, char* argv[])
-int main()
+
+void startLineObjectFile(char* buffer, size_t bufferSize, char* ADDRESS)
 {
-    /*if (argc != 2)
+    buffer[0] = 'T';
+    char paddedAddress[7];
+    snprintf(paddedAddress, sizeof(paddedAddress), "%06s", ADDRESS);
+    strncat_s(buffer, bufferSize, paddedAddress, bufferSize - strlen(buffer) - 1);
+    strncat_s(buffer, bufferSize, "@@", bufferSize - strlen(buffer) - 1);   // Placeholder line length characters
+}
+
+int main(int argc, char* argv[])
+{
+    if (argc != 2)
     {
-        printf("Usage: %s <file_path>\n", argv[0]);
+        printf("\nUsage: %s <file_name>\n", argv[0]);
         return 1;
     }
 
@@ -345,87 +367,86 @@ int main()
     {
         perror("Error opening file");
         return EXIT_FAILURE;
-    }*/
-
-    FILE* file = fopen("C:\\Users\\Hannah\\Dropbox\\2024 Fall\\CIS335 Language Processors\\Assignments\\Assignment 4\\SIC_XE_PROG.txt", "r");
-    if (file == NULL)
-    {
-        perror("Error opening file");
-        return EXIT_FAILURE;
     }
 
-    printf("Author Info: Hannah Simon & Charlie Strickland\n\n");
+    printf("\nAuthor Info: Hannah Simon & Charlie Strickland\n\n");
 
     char line[256], lineCopy[256];
-    char* LABEL = NULL, * OPCODE = NULL, * OPERAND = NULL, * context = NULL;
+    char * LABEL = NULL, * OPCODE = NULL, * OPERAND = NULL, * context = NULL;
     int LOCCTR = 0;
     bool firstLine = true;
-    FILE* IntermediateFile = fopen("IntermediateFile.txt", "w");
-    FILE* ListingFile = fopen("ListingFile.txt", "w");
-    FILE* ObjectFile = fopen("ObjectCode.txt", "w");
+    FILE* IntermediateFile = fopen("sicxe_intermediate.txt", "w");
 
-    fprintf(IntermediateFile, "LINE\tLOCCTR\tSOURCE_STATEMENT\n");
+    fprintf(IntermediateFile, "LINE\tLOCCTR\t   SOURCE_STATEMENT\n");
 
-    //Pass 1
+    // Pass 1
     while (fgets(line, sizeof(line), file))
     {
+        // Increase line number by 5 each line
         lineNumber += 5;
 
+        // If the line is a comment
         if (line[0] == '.')
         {
-            strcpy_s(lineCopy, sizeof(lineCopy), line);
-            fprintf(IntermediateFile, "%d\t%s", lineNumber, lineCopy);
+            strcpy_s(lineCopy, sizeof(lineCopy), line); 
+            fprintf(IntermediateFile, "%d\t%s", lineNumber, lineCopy); // Copy the line directly to the intermediate file
             continue;
         }
-        else if (line[0] != ' ')
+        else if (line[0] != ' ') // Else if the first char in the line isn't empty (a label is present)
         {
+            // Tokenize line and assign each variable appropriately
             LABEL = strtok_s(line, " \n", &context);
             OPCODE = strtok_s(NULL, " \n", &context);
             OPERAND = strtok_s(NULL, " \n", &context);
         }
-        else
+        else // Else if the first char in the line is empty
         {
-            LABEL = NULL;
+            LABEL = NULL; // Tokenize and assign each properly, but LABEl is NULL
             OPCODE = strtok_s(line, " \n", &context);
             OPERAND = strtok_s(NULL, " \n", &context);
         }
 
-        if (firstLine)
+        // If first line of file
+        if (firstLine) 
         {
             if (strcmp(OPCODE, "START") == 0)
             {
-                LOCCTR = atoi(OPERAND);
+                LOCCTR = atoi(OPERAND); // Set LOCCTR to wherever START indicates
             }
-            fprintf(IntermediateFile, "%d\t%X\t%s\t%s\t%s\n", lineNumber, LOCCTR, LABEL, OPCODE, OPERAND);
-            if (LABEL != NULL)
+            fprintf(IntermediateFile, "%d\t%04X\t%s\t%s\t%s\n", lineNumber, LOCCTR, LABEL, OPCODE, OPERAND); // Write line to file
+            if (LABEL != NULL) // If theres a label, add it to symbol table
             {
                 addSymbol(LABEL, LOCCTR);
             }
-            firstLine = false;
+            firstLine = false; // No longer first line
             continue;
         }
 
-        if (LABEL != NULL)
+        if (LABEL != NULL) // If there is a label, add it to the symbol tabel with its LOCCTR
         {
             addSymbol(LABEL, LOCCTR);
         }
-        if (strcmp(OPCODE, "START") != 0)
+        if (strcmp(OPCODE, "START") != 0) // If the opcode isn't START (since START should only appear once)
         {
             bool isDirective = false;
             bool isOpcode = false;
-            if (isValidDirective(OPCODE))
+            if (isValidDirective(OPCODE)) // If the opcode is an allowed directive...
             {
                 isDirective = true;
-                writeToIntermediateFile(IntermediateFile, LOCCTR, LABEL, OPCODE, OPERAND, isOpcode);
-                if (strcmp(OPCODE, "END") == 0)
+                writeToIntermediateFile(IntermediateFile, LOCCTR, LABEL, OPCODE, OPERAND, isOpcode); // Write the line to the file
+                if (strcmp(OPCODE, "END") == 0) // If it's END, end of file
                 {
                     break;
                 }
-                else if (strcmp(OPCODE, "RESW") == 0)
+                else if (strcmp(OPCODE, "BASE") == 0)
+                {
+                    LOCCTR = LOCCTR;
+                }
+                else if (strcmp(OPCODE, "RESW") == 0) // Increment LOCCTR by 3 bytes per reserved word
                 {
                     LOCCTR += 3 * atoi(OPERAND);
                 }
-                else if (strcmp(OPCODE, "RESB") == 0)
+                else if (strcmp(OPCODE, "RESB") == 0) // Increment LOCCTR by 1 byte per reserved byte
                 {
                     LOCCTR += atoi(OPERAND);
                 }
@@ -441,24 +462,24 @@ int main()
                         int hexLength = (strlen(OPERAND) - 3 + 1) / 2; // The +1 ensures rounding for odd numbers, Divide by 2 since 2 hex digits represent 1 byte
                         LOCCTR += hexLength;
                     }
-                    else
+                    else // Error
                     {
                         printf("Error: Pass 1, Line %d: Invalid BYTE format for operand %s\n", lineNumber, OPERAND);
                         exit(EXIT_FAILURE);
                     }
                 }
-                else
+                else // Valid directive, but nothing that manipulates the LOCCTR unnaturally
                 {
                     LOCCTR += 3;
                 }
-                fprintf(IntermediateFile, "\n");
+                fprintf(IntermediateFile, "\n"); // New line after determining new LOCCTR
             }
-            else if (isValidOpcode(OPCODE))
+            else if (isValidOpcode(OPCODE)) // Opcode is valid but NOT a directive
             {
                 isOpcode = true;
-                writeToIntermediateFile(IntermediateFile, LOCCTR, LABEL, OPCODE, OPERAND, isOpcode);
-                fprintf(IntermediateFile, "\n");
-                char format = getFormat(OPCODE);
+                writeToIntermediateFile(IntermediateFile, LOCCTR, LABEL, OPCODE, OPERAND, isOpcode); // Write to file
+                fprintf(IntermediateFile, "\n"); // New line
+                char format = getFormat(OPCODE); // Increment LOCCTR appropriately per format
                 if (format == '1')
                 {
                     LOCCTR += 1;
@@ -475,44 +496,50 @@ int main()
                 {
                     LOCCTR += 4;
                 }
-                else
+                else // Error if opcode not correct
                 {
                     printf("Error: Pass 1, Line %d: Invalid format for opcode '%s'\n", lineNumber, OPCODE);
                 }
             }
-            else
+            else // Not an opcode or directive
             {
                 printf("Error: Pass 1, Line %d: Invalid operation '%s'\n", lineNumber, OPCODE);
                 exit(EXIT_FAILURE);
             }
         }
     }
-
+    // End of pass 1, close intermediate for writing, open for reading
     fclose(IntermediateFile);
-    fopen_s(IntermediateFile, "IntermediateFile.txt", "r");
+
+    // Start of pass 2
+    fopen_s(IntermediateFile, "sicxe_intermediate.txt", "r");
+    FILE* ListingFile = fopen("sicxe_listing.txt", "w");
+    FILE* ObjectFile = fopen("sicxe_object.txt", "w");
     char* LINE = NULL, * ADDRESS = NULL;
     firstLine = true; char* LINE2 = NULL, * ADDRESS2 = NULL; bool baseSet = false; int baseAddress = NULL;
     char nextLine[256] = { 0 };
     char buffer[70] = { 0 };
+    int startingAddress = 0;
 
-    // PASS 2
+    // Pass 2
     while (fgets(line, sizeof(line), IntermediateFile))
     {
-        strcpy_s(lineCopy, sizeof(lineCopy), line);
+        strcpy_s(lineCopy, sizeof(lineCopy), line); // Copy line in from intermediate
         
-        size_t len = strlen(lineCopy);
-        if (len > 0 && lineCopy[len - 1] == '\n')
-{
+        size_t len = strlen(lineCopy); 
+        if (len > 0 && lineCopy[len - 1] == '\n') // Making sure string is properly null terminated for manipulation later on3
+        {
             lineCopy[len - 1] = '\0';
         }
 
-        if (firstLine && line[0] != '.')
+        if (firstLine && line[0] != '.') // First line AND first line intermediate isn't a comment
         {
-            fprintf(ListingFile, "%s\tOBJ_CODE\n", lineCopy);
+            fprintf(ListingFile, "%s\tOBJ_CODE\n", lineCopy); // Append OBJ_CODE to column identifiers
             firstLine = false;
             continue;
         }
 
+        // Tokenize each column in
         LINE = strtok_s(line, "\t\n", &context);
         ADDRESS = strtok_s(NULL, " \t\n", &context);
         LABEL = strtok_s(NULL, " \t\n", &context);
@@ -523,7 +550,7 @@ int main()
         {
             break;
         }
-        if (OPCODE == NULL)
+        if (OPCODE == NULL) // Make sure variables are read in correctly, accounting for whitespace
         {
             OPCODE = LABEL;
             LABEL = NULL;
@@ -535,15 +562,16 @@ int main()
             LABEL = NULL;
         }
 
-        if (strcmp(ADDRESS, ".") == 0)
+        if (strcmp(ADDRESS, ".") == 0) // Comment, directly copy to listing
         {
             fprintf(ListingFile, "%s\n", lineCopy);
             continue;
         }
-        if (strcmp(OPCODE, "START") == 0)
+        if (strcmp(OPCODE, "START") == 0) // START directive, only appears once, copy line to listing and start object file
         {
+            startingAddress = (int)strtol(ADDRESS, NULL, 16);
             fprintf(ListingFile, "%s\n", lineCopy);
-            fprintf(ObjectFile, "H%s\t%06s%06d\n", LABEL, ADDRESS, LOCCTR - atoi(ADDRESS));
+            fprintf(ObjectFile, "H%s\t%06s%06X\n", LABEL, ADDRESS, LOCCTR - atoi(ADDRESS)); // H (1) + program name (2-7) + starting address in hex (8-13) + length of program in bytes, in hex (14-19)
             continue;
         }
 
@@ -551,19 +579,15 @@ int main()
         int ADDR = NULL;
         char objectCode[33];
         char format = getFormat(OPCODE);
-
-        if (strcmp(OPCODE, "LDB") == 0)
-        {
-            int y = 3;
-        }
         
-        if (strcmp(OPCODE, "BASE") == 0)
+        if (strcmp(OPCODE, "BASE") == 0) // Use base addressing if PC addressing not available. LOCCTR - B where B is the address of the symbol BASE indicates
         {
             baseSet = true;
             baseAddress = getSymbolAddress(OPERAND);
+            fprintf(ListingFile, "%s\n", lineCopy);
             continue;
         }
-        else if (strcmp(OPCODE, "NOBASE") == 0)
+        else if (strcmp(OPCODE, "NOBASE") == 0) // Turn off base addressing
         {
             baseSet = false;
             continue;
@@ -623,52 +647,54 @@ int main()
             if (strlen(OPERAND) == 1)
             {
                 int code = binaryToInt(getRegisterCode(OPERAND[0]));
-                snprintf(objectCode, sizeof(objectCode), "%02X%02X00", OPCODEINT, code);
+                snprintf(objectCode, sizeof(objectCode), "%02X%01X0", OPCODEINT, code);
             }
             else if (strlen(OPERAND) == 3)
                 {
                 int code1 = binaryToInt(getRegisterCode(OPERAND[0]));
                 int code2 = binaryToInt(getRegisterCode(OPERAND[2]));
-                snprintf(objectCode, sizeof(objectCode), "%02X%02X%02X", OPCODEINT, code1, code2);
+                snprintf(objectCode, sizeof(objectCode), "%02X%01X%01X", OPCODEINT, code1, code2);
             }
         }
-        else if (format == '3')
+        else if (format == '3') // Else if format 3 / 4
         {
             char binaryString[13];
             char* OPCODECHAR = intToBinary(getMachineCode(OPCODE));
-            OPCODECHAR[strlen(OPCODECHAR) - 2] = '\0';
+            OPCODECHAR[6] = '\0';
            
-            if (OPERAND != NULL && OPERAND[0] == '#' && strcmp(OPERAND + 1, "LENGTH") != 0)
+           // If operand is #number
+            if (OPERAND != NULL && OPERAND[0] == '#' && isalpha(OPERAND[1]) == 0)
             {
                 int number = atoi(OPERAND + 1);
-                //check if number is in hex
-                
-                if (0 <= number <= 4095)
+                // If 0 <= number <= 4095
+                if (number >= 0 && number <= 4095)
                 {
-                    snprintf(binaryString, sizeof(binaryString), "%s010000", OPCODECHAR);
+                    snprintf(binaryString, sizeof(binaryString), "%s010000", OPCODECHAR); // opcode + flags 010000
                     char* hexString = binaryToHex(binaryString);
-                    snprintf(objectCode, sizeof(objectCode), "%03s%03X", hexString, number);
+                    snprintf(objectCode, sizeof(objectCode), "%03s%03X", hexString, number); // + 12 bit immediate value
                 }
-                else if (4096 <= number <= 1048575 && OPCODE[0] == '+')
+                else if (number >= 0 && number <= 1048575 && OPCODE[0] == '+') // Else if 4096 <= number <= 1048575 AND + before opcode
                 {
-                    snprintf(binaryString, sizeof(binaryString), "%s010001", OPCODECHAR);
+                    snprintf(binaryString, sizeof(binaryString), "%s010001", OPCODECHAR); // opcode + flags 010001
                     char* hexString = binaryToHex(binaryString);
-                    snprintf(objectCode, sizeof(objectCode), "%03s%03X", hexString, number);
+                    snprintf(objectCode, sizeof(objectCode), "%03s%05X", hexString, number); // + 20 bit immediate value
                 }
-                else
+                else // Error
                 {
                     printf("Error: Pass 2, Line %s: Immediate number out of range %s\n", LINE, OPERAND);
                     exit(EXIT_FAILURE);
-                    //add exit statements for all errors in pass 2
                 }
             }
-            else if (OPERAND != NULL)
+            else if (OPERAND != NULL) // Else if operand is not blank
             {
                 ADDR = getSymbolAddress(OPERAND);
-                if (ADDR == NULL)
+                if (ADDR == NULL) // Confirms symbol existence
                 {
                     printf("Error: Pass 2, Line %s: Symbol not found %s\n", LINE, OPERAND);
+                    exit(EXIT_FAILURE);
                 }
+
+                // Get next instruction's address for PC-relative addressing
                 long int currentPos = ftell(IntermediateFile);  // Save the current file position
                 if (fgets(nextLine, sizeof(nextLine), IntermediateFile))
                 {
@@ -677,61 +703,71 @@ int main()
                 }
                 fseek(IntermediateFile, currentPos, SEEK_SET);
 
-                if (OPCODE[0] == '+')
+
+                if (OPCODE[0] == '+') // Format 4
                 {
                     snprintf(binaryString, sizeof(binaryString), "%s110001", OPCODECHAR);
                     char* hexString = binaryToHex(binaryString);
-                    snprintf(objectCode, sizeof(objectCode), "%s%03X", hexString, ADDR);
+                    snprintf(objectCode, sizeof(objectCode), "%03s%05X", hexString, ADDR & 0xFFFFF);
                 }
-
-                else if (-2048 <= ADDR - atoi(ADDRESS2) <= 2047)
+                else // Try PC-relative first
                 {
-                    snprintf(binaryString, sizeof(binaryString), "%s110010", OPCODECHAR);
-                    char* hexString = binaryToHex(binaryString);
-                    int displacement = ADDR - atoi(ADDRESS2);
-                    snprintf(objectCode, sizeof(objectCode), "%03s%03X", hexString, displacement);
-                }
-                else if (baseSet && 0 <= ADDR - baseAddress <= 4095)
-                {
-                    snprintf(binaryString, sizeof(binaryString), "%s110100", OPCODECHAR);
-                    char* hexString = binaryToHex(binaryString);
-                    int displacement = ADDR - baseAddress;
-                    snprintf(objectCode, sizeof(objectCode), "%03s%03X", hexString, displacement);
-                }
-                else
-                {
-                    printf("Error: Pass 2, Line %s: Instruction addressing error %s\n", LINE, lineCopy);
-                    exit(EXIT_FAILURE);
+                    int pc = (ADDRESS2 != NULL) ? (int)strtol(ADDRESS2, NULL, 16) : 0;
+                    int displacement = ADDR - pc;
+                    
+                    if (displacement >= -2048 && displacement <= 2047) 
+                    {
+                        snprintf(binaryString, sizeof(binaryString), "%s110010", OPCODECHAR);
+                        char* hexString = binaryToHex(binaryString);
+                        if (displacement < 0) 
+                        {
+                            displacement = convertToTwosComplement(displacement, 12);
+                        }
+                        snprintf(objectCode, sizeof(objectCode), "%03s%03X", hexString, displacement & 0xFFF);
+                    }
+                    else if (baseSet && (ADDR - baseAddress >= 0) && (ADDR - baseAddress <= 4095)) // Try base-relative if PC-relative fails
+                    {
+                        snprintf(binaryString, sizeof(binaryString), "%s110100", OPCODECHAR);
+                        char* hexString = binaryToHex(binaryString);
+                        int displacement = ADDR - baseAddress;
+                        snprintf(objectCode, sizeof(objectCode), "%03s%03X", hexString, displacement & 0xFFF);
+                    }
+                    else 
+                    {
+                        printf("Error: Pass 2, Line %s: Address out of range for format 3\n", LINE);
+                        exit(EXIT_FAILURE);
+                    }
                 }
             }
-            else
+            else // Else operand is blank (ex. RSUB)
             {
-                snprintf(binaryString, sizeof(binaryString), "%s110000", OPCODECHAR);
+                snprintf(binaryString, sizeof(binaryString), "%s110000", OPCODECHAR); // opcode + flags 110000
                 char* hexString = binaryToHex(binaryString);
-                snprintf(objectCode, sizeof(objectCode), "%03s000", hexString);
+                snprintf(objectCode, sizeof(objectCode), "%03s000", hexString); // + 12 bit displacement (000)
             }
+            
             if (OPERAND != NULL)
             {
-                if (OPERAND[0] == '#')
+                if (OPERAND[0] == '#') // If # before operand
                 {
                     char* objectCodeHex = hexToBinary(objectCode);
-                    objectCodeHex[6] = '0';
+                    objectCodeHex[6] = '0'; // set n bit to 0
                     snprintf(objectCode, sizeof(objectCode), "%s", binaryToHex(objectCodeHex));
                 }
-                else if (OPERAND[0] == '@')
+                else if (OPERAND[0] == '@') // If @ before operand
                 {
                     char* objectCodeHex = hexToBinary(objectCode);
-                    objectCode[7] = '0';
+                    objectCodeHex[7] = '0'; // set i bit to 0
                     snprintf(objectCode, sizeof(objectCode), "%s", binaryToHex(objectCodeHex));
-                }
-                else if (strlen(OPERAND) >= 2 && OPERAND[strlen(OPERAND) - 2] == ',' && OPERAND[strlen(OPERAND) - 1] == 'X')
+                } 
+                //else if (strlen(OPERAND) >= 2 && OPERAND[strlen(OPERAND) - 2] == ',' && OPERAND[strlen(OPERAND) - 1] == 'X') // If line contains unexpected ,X
+                else if (strstr(OPERAND, ",X") != NULL)
                 {
                     char* objectCodeHex = hexToBinary(objectCode);
-                    objectCode[8] = '1';
+                    objectCodeHex[8] = '1'; // set x bit to 1
                     snprintf(objectCode, sizeof(objectCode), "%s", binaryToHex(objectCodeHex));
                 }
             }
-            printf("%s\t%s\n", lineCopy, objectCode);
         }
         else if (strcmp(OPCODE, "END") != 0)
         {
@@ -739,39 +775,41 @@ int main()
             exit(EXIT_FAILURE);
         }
         
-        fprintf(ListingFile, "%s\t%s\n", lineCopy, objectCode);
-
         if (strcmp(OPCODE, "END") == 0)
         {
+            fprintf(ListingFile, "%s\n", lineCopy);
             if (strlen(buffer) > 0)
             {
                 writeToObjectFile(ObjectFile, buffer);
             }
-            fprintf(ObjectFile, "E%s", objectCode);
+            fprintf(ObjectFile, "E%06X", startingAddress);
             break;
         }
-        if (buffer[0] == '\0')
+
+        fprintf(ListingFile, "%s\t%s\n", lineCopy, objectCode);
+
+        // Writing text (T) records to object file
+        if (buffer[0] == '\0') // If buffer is empty, start a new line
         {
-            buffer[0] = 'T';
-            char paddedAddress[7];
-            snprintf(paddedAddress, sizeof(paddedAddress), "%06s", ADDRESS);
-            strncat_s(buffer, sizeof(buffer), paddedAddress, sizeof(buffer) - strlen(buffer) - 1);
-            strncat_s(buffer, sizeof(buffer), "1E", sizeof(buffer) - strlen(buffer) - 1);   // Placeholder
+            startLineObjectFile(buffer, sizeof(buffer), ADDRESS);
         }
-        if (strlen(buffer) + strlen(objectCode) >= 69)
+        if (strlen(buffer) + strlen(objectCode) > 69) // If the buffer would be over 69 characters, write the buffer into the file and start a new one
         {
             writeToObjectFile(ObjectFile, buffer);
+            startLineObjectFile(buffer, sizeof(buffer), ADDRESS);
+            strcat_s(buffer, sizeof(buffer), objectCode); // Once new line has started, add current object code
         }
-        else
+        else // Add the object code to the buffer
         {
             strcat_s(buffer, sizeof(buffer), objectCode);
         }
     }
 
+    // Prints symbol table to listing
     fprintf(ListingFile, "\nSYMBOL\tADDRESS\n");
     for (int i = 0; i < symbolCount; i++)
     {
-        fprintf(ListingFile, "%s\t%d", symbolTable[i].name, symbolTable[i].address);
+        fprintf(ListingFile, "%s\t%04X", symbolTable[i].name, symbolTable[i].address);
         if (i < symbolCount - 1)
         {
             fprintf(ListingFile, "\n");
