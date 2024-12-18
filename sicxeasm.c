@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdbool.h>
 
-const char* DIRECTIVES[] = {"BYTE", "WORD", "RESB", "RESW", "END", "BASE", "NOBASE"};
+const char* DIRECTIVES[] = { "BYTE", "WORD", "RESB", "RESW", "END", "BASE", "NOBASE" };
 #define DIRECTIVES_SIZE (sizeof(DIRECTIVES) / sizeof(DIRECTIVES[0]))
 
 int isValidDirective(const char* OPCODE)
@@ -87,11 +87,11 @@ int isValidOpcode(char* OPCODE)
 unsigned short int getMachineCode(const char* OPCODE)
 {
     // If opcode starts with +, skip the + character
-    if (OPCODE[0] == '+') 
+    if (OPCODE[0] == '+')
     {
         OPCODE++;
     }
-    
+
     for (int i = 0; i < OPTAB_SIZE; i++)
     {
         if (strcmp(OPTAB[i].Mnemonic, OPCODE) == 0)
@@ -178,10 +178,10 @@ int getSymbolAddress(char* nameInput)
     return NULL;
 }
 
-int convertToTwosComplement(int displacement, int bits) 
+int convertToTwosComplement(int displacement, int bits)
 {
     // If number is negative
-    if (displacement < 0) 
+    if (displacement < 0)
     {
         // Calculate two's complement
         int mask = (1 << bits) - 1;  // Create mask for specified bits
@@ -190,7 +190,7 @@ int convertToTwosComplement(int displacement, int bits)
     return displacement;
 }
 
-const char* RegisterCodes[] = 
+const char* RegisterCodes[] =
 {
     "0000", // A
     "0001", // X
@@ -203,9 +203,9 @@ const char* RegisterCodes[] =
     "1001"  // SW
 };
 
-const char* getRegisterCode(char letter) 
+const char* getRegisterCode(char letter)
 {
-    switch (letter) 
+    switch (letter)
     {
     case 'A': return RegisterCodes[0];
     case 'X': return RegisterCodes[1];
@@ -241,23 +241,23 @@ void writeToObjectFile(FILE* ObjectFile, char* buffer)
     memset(buffer, 0, sizeof(buffer));
 }
 
-char* intToBinary(int n) 
+char* intToBinary(int n)
 {
     // Allocate enough space for 8 bits (one byte) plus null terminator
     char* binaryString = malloc(9);
-    if (binaryString == NULL) 
+    if (binaryString == NULL)
     {
         return NULL;
     }
-    
+
     // Always generate 8 bits, filling from right to left
-    for (int i = 7; i >= 0; i--) 
+    for (int i = 7; i >= 0; i--)
     {
         binaryString[i] = (n & 1) ? '1' : '0';
         n >>= 1;
     }
     binaryString[8] = '\0';
-    
+
     return binaryString;
 }
 
@@ -315,9 +315,9 @@ char* hexToBinary(const char* hex) {
     binary[0] = '\0';  // Initialize the binary string as an empty string
 
     // Map each hex character to its 4-bit binary equivalent
-    for (int i = 0; i < len; i++) 
-        {
-        switch (hex[i]) 
+    for (int i = 0; i < len; i++)
+    {
+        switch (hex[i])
         {
         case '0': strcat_s(binary, len * 4 + 1, "0000"); break;
         case '1': strcat_s(binary, len * 4 + 1, "0001"); break;
@@ -362,8 +362,8 @@ int main(int argc, char* argv[])
     }
 
     char* file_path = argv[1];
-    FILE* file = fopen(file_path, "r");
-    if (file == NULL)
+    FILE* InputFile = fopen(file_path, "r");
+    if (InputFile == NULL)
     {
         perror("Error opening file");
         return EXIT_FAILURE;
@@ -372,7 +372,7 @@ int main(int argc, char* argv[])
     printf("\nAuthor Info: Hannah Simon & Charlie Strickland\n\n");
 
     char line[256], lineCopy[256];
-    char * LABEL = NULL, * OPCODE = NULL, * OPERAND = NULL, * context = NULL;
+    char* LABEL = NULL, * OPCODE = NULL, * OPERAND = NULL, * context = NULL;
     int LOCCTR = 0;
     bool firstLine = true;
     FILE* IntermediateFile = fopen("sicxe_intermediate.txt", "w");
@@ -380,7 +380,7 @@ int main(int argc, char* argv[])
     fprintf(IntermediateFile, "LINE\tLOCCTR\t   SOURCE_STATEMENT\n");
 
     // Pass 1
-    while (fgets(line, sizeof(line), file))
+    while (fgets(line, sizeof(line), InputFile))
     {
         // Increase line number by 5 each line
         lineNumber += 5;
@@ -388,7 +388,7 @@ int main(int argc, char* argv[])
         // If the line is a comment
         if (line[0] == '.')
         {
-            strcpy_s(lineCopy, sizeof(lineCopy), line); 
+            strcpy_s(lineCopy, sizeof(lineCopy), line);
             fprintf(IntermediateFile, "%d\t%s", lineNumber, lineCopy); // Copy the line directly to the intermediate file
             continue;
         }
@@ -407,7 +407,7 @@ int main(int argc, char* argv[])
         }
 
         // If first line of file
-        if (firstLine) 
+        if (firstLine)
         {
             if (strcmp(OPCODE, "START") == 0)
             {
@@ -525,8 +525,8 @@ int main(int argc, char* argv[])
     while (fgets(line, sizeof(line), IntermediateFile))
     {
         strcpy_s(lineCopy, sizeof(lineCopy), line); // Copy line in from intermediate
-        
-        size_t len = strlen(lineCopy); 
+
+        size_t len = strlen(lineCopy);
         if (len > 0 && lineCopy[len - 1] == '\n') // Making sure string is properly null terminated for manipulation later on3
         {
             lineCopy[len - 1] = '\0';
@@ -579,7 +579,7 @@ int main(int argc, char* argv[])
         int ADDR = NULL;
         char objectCode[33];
         char format = getFormat(OPCODE);
-        
+
         if (strcmp(OPCODE, "BASE") == 0) // Use base addressing if PC addressing not available. LOCCTR - B where B is the address of the symbol BASE indicates
         {
             baseSet = true;
@@ -635,7 +635,7 @@ int main(int argc, char* argv[])
                 exit(EXIT_FAILURE);
             }
         }
-  
+
         else if (format == '1')
         {
             OPCODEINT = getMachineCode(OPCODE);
@@ -650,7 +650,7 @@ int main(int argc, char* argv[])
                 snprintf(objectCode, sizeof(objectCode), "%02X%01X0", OPCODEINT, code);
             }
             else if (strlen(OPERAND) == 3)
-                {
+            {
                 int code1 = binaryToInt(getRegisterCode(OPERAND[0]));
                 int code2 = binaryToInt(getRegisterCode(OPERAND[2]));
                 snprintf(objectCode, sizeof(objectCode), "%02X%01X%01X", OPCODEINT, code1, code2);
@@ -661,8 +661,8 @@ int main(int argc, char* argv[])
             char binaryString[13];
             char* OPCODECHAR = intToBinary(getMachineCode(OPCODE));
             OPCODECHAR[6] = '\0';
-           
-           // If operand is #number
+
+            // If operand is #number
             if (OPERAND != NULL && OPERAND[0] == '#' && isalpha(OPERAND[1]) == 0)
             {
                 int number = atoi(OPERAND + 1);
@@ -714,12 +714,12 @@ int main(int argc, char* argv[])
                 {
                     int pc = (ADDRESS2 != NULL) ? (int)strtol(ADDRESS2, NULL, 16) : 0;
                     int displacement = ADDR - pc;
-                    
-                    if (displacement >= -2048 && displacement <= 2047) 
+
+                    if (displacement >= -2048 && displacement <= 2047)
                     {
                         snprintf(binaryString, sizeof(binaryString), "%s110010", OPCODECHAR);
                         char* hexString = binaryToHex(binaryString);
-                        if (displacement < 0) 
+                        if (displacement < 0)
                         {
                             displacement = convertToTwosComplement(displacement, 12);
                         }
@@ -732,7 +732,7 @@ int main(int argc, char* argv[])
                         int displacement = ADDR - baseAddress;
                         snprintf(objectCode, sizeof(objectCode), "%03s%03X", hexString, displacement & 0xFFF);
                     }
-                    else 
+                    else
                     {
                         printf("Error: Pass 2, Line %s: Address out of range for format 3\n", LINE);
                         exit(EXIT_FAILURE);
@@ -745,7 +745,7 @@ int main(int argc, char* argv[])
                 char* hexString = binaryToHex(binaryString);
                 snprintf(objectCode, sizeof(objectCode), "%03s000", hexString); // + 12 bit displacement (000)
             }
-            
+
             if (OPERAND != NULL)
             {
                 if (OPERAND[0] == '#') // If # before operand
@@ -759,7 +759,7 @@ int main(int argc, char* argv[])
                     char* objectCodeHex = hexToBinary(objectCode);
                     objectCodeHex[7] = '0'; // set i bit to 0
                     snprintf(objectCode, sizeof(objectCode), "%s", binaryToHex(objectCodeHex));
-                } 
+                }
                 //else if (strlen(OPERAND) >= 2 && OPERAND[strlen(OPERAND) - 2] == ',' && OPERAND[strlen(OPERAND) - 1] == 'X') // If line contains unexpected ,X
                 else if (strstr(OPERAND, ",X") != NULL)
                 {
@@ -774,7 +774,7 @@ int main(int argc, char* argv[])
             printf("Error: Pass 2, Line %s: Invalid format for opcode '%s'\n", LINE, OPCODE);
             exit(EXIT_FAILURE);
         }
-        
+
         if (strcmp(OPCODE, "END") == 0)
         {
             fprintf(ListingFile, "%s\n", lineCopy);
@@ -817,8 +817,11 @@ int main(int argc, char* argv[])
     }
 
     fclose(IntermediateFile);
+    printf("Listing file created (this can be safely deleted): sicxe_intermediate.txt\n");
     fclose(ListingFile);
+    printf("Listing file created: sicxe_listing.txt\n");
     fclose(ObjectFile);
-    fclose(file);
+    printf("Object file created: sicxe_object.txt\n");
+    fclose(InputFile);
     return 0;
 }
