@@ -65,7 +65,7 @@
   - `Unable to assemble into Format 3; Format 4 not specified`: An instruction's operand requires format 4 addressing but was not specified.
 
 ## Sample Program Inputs & Outputs
-- Sample input and output files are included in the repository for reference.
+- Sample input and output files are included in the repository for reference in the `SIC sample_io` and `SIC_XE sample_io` folders.
 - `sicasm.c` Program:
   - Input: `SIC_PROG.txt`
   - Outputs: `sic_immediate.txt`, `sic_listing.txt`, `sic_object.txt`
