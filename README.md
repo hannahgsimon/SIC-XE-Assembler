@@ -68,3 +68,6 @@
 ## References
 [1] Beck, L. L. (1997). *System Software: An Introduction to Systems Programming* (3rd ed.). Addison-Wesley.  
 [2] Wikimedia Foundation. (2024, December 16). *Simplified Instructional Computer*. Wikipedia. https://en.wikipedia.org/wiki/Simplified_Instructional_Computer
+
+## Authors
+This project was collaboratively developed by Hannah G. Simon and Charlie Strickland.
