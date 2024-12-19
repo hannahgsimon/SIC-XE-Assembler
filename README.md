@@ -33,28 +33,28 @@
       - Symbol table
   3. An object file containing the final assembled object code
 
-## Requirements
-- C Compiler
-- Command-line interface to run the assembler program
-
-## How to Use
-1. Compile the source code:
-      ```bash
-      gcc sicasm.c -o sicasm
-      ```
-      ```bash
-      gcc sicxeasm.c -o sicasm
-      ```
-2. Run the assembler with the input assembly source code file:
-      ```bash
-      ./sicasm SIC_PROG.txt
-      ```
-      ```bash
-      ./sicxeasm SIC_PROG.txt
-      ```
-3. Each program will generate three output files:
-    - `sic_intermediate.txt`, `sic_listing.txt`, and `sic_object.txt`
-    - `sicxe_intermediate.txt`, `sicxe_listing.txt`, and `sicxe_object.txt`
+## Setup & Usage
+1. Requirements:
+    - C Compiler
+    - Command-line interface to run the assembler program
+2. How to Use:
+    1. Compile the source code:
+          ```bash
+          gcc sicasm.c -o sicasm
+          ```
+          ```bash
+          gcc sicxeasm.c -o sicasm
+          ```
+    2. Run the assembler with the input assembly source code file:
+          ```bash
+          ./sicasm SIC_PROG.txt
+          ```
+          ```bash
+          ./sicxeasm SIC_PROG.txt
+          ```
+    3. Each program will generate three output files:
+        - `sic_intermediate.txt`, `sic_listing.txt`, and `sic_object.txt`
+        - `sicxe_intermediate.txt`, `sicxe_listing.txt`, and `sicxe_object.txt`
 
 ## Sample Program Inputs & Outputs
 - Sample input and output files are included in the repository for reference in the `SIC sample_io` and `SIC_XE sample_io` folders.
