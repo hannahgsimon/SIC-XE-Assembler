@@ -56,14 +56,6 @@
     - `sic_intermediate.txt`, `sic_listing.txt`, and `sic_object.txt`
     - `sicxe_intermediate.txt`, `sicxe_listing.txt`, and `sicxe_object.txt`
 
-## Error Handling
-- Pass 1 Errors:
-  - `Duplicate symbol`: A symbol is defined more than once.
-  - `Invalid operation`: An unrecognized opcode is encountered.
-- Pass 2 Errors:
-  - `Symbol not found`: A symbol used in an instruction is not defined in the symbol table.
-  - `Unable to assemble into Format 3; Format 4 not specified`: An instruction's operand requires format 4 addressing but was not specified.
-
 ## Sample Program Inputs & Outputs
 - Sample input and output files are included in the repository for reference in the `SIC sample_io` and `SIC_XE sample_io` folders.
 - `sicasm.c` Program:
