@@ -1,7 +1,7 @@
 # SIC/XE Assembler
 
 ## Overview
-- SIC/XE is a hypothetical architecture introduced in *System Software: An Introduction to Systems Programming*, by Leland Beck to explain the concepts of assemblers, compilers, and operating systems [1].
+- SIC/XE is a hypothetical architecture introduced in *System Software: An Introduction to Systems Programming*, by Leland Beck to explain the concepts of assemblers, compilers, and operating systems [1; 2].
 - The `sicasm.c` program implements a two-pass assembler for the SIC (Simplified Instructional Computer) machine architecture.
 - The `sicxeasm.c` program implements a two-pass assembler for the SIC/XE (Simplified Instructional Computer with Extra Equipment) machine architecture.
 - Both programs read an assembly language program for the SIC or SIC/XE machines respectively, process it, and produce three output files:
@@ -74,4 +74,5 @@
   - Outputs: `sicxe_immediate.txt`, `sicxe_listing.txt`, `sicxe_object.txt`
 
 ## References
-[1] Wikimedia Foundation. (2024, December 16). *Simplified Instructional Computer*. Wikipedia. https://en.wikipedia.org/wiki/Simplified_Instructional_Computer 
+[1] Beck, L. L. (1997). *System Software: An Introduction to Systems Programming* (3rd ed.). Addison-Wesley.  
+[2] Wikimedia Foundation. (2024, December 16). *Simplified Instructional Computer*. Wikipedia. https://en.wikipedia.org/wiki/Simplified_Instructional_Computer
