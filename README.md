@@ -38,7 +38,7 @@
     - C Compiler (e.g., GCC, MSVC)
     - Command-line interface to run the assembler program
     - Standard C libraries: `stdio.h`, `stdlib.h`, `string.h`, `stdbool.h`
-2. Compile the source code:
+2. Compile the source code into an executable:
     ```bash
     gcc sicasm.c -o sicasm
     ```
