@@ -35,7 +35,7 @@
 
 ## Setup & Usage
 1. Ensure the following prerequisites are installed:
-    - C Compiler
+    - C Compiler (e.g., GCC, MSVC)
     - Command-line interface to run the assembler program
     - Standard C libraries: `stdio.h`, `stdlib.h`, `string.h`, `stdbool.h`
 2. Compile the source code:
